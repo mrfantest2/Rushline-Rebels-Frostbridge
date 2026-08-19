@@ -117,6 +117,7 @@ A room contains:
 - settings
 - players map
 - current round state or null
+- last completed round result or null
 
 Default settings:
 
@@ -135,6 +136,7 @@ A player contains:
 - session token digest
 - connection state
 - reconnect deadline when disconnected
+- ready flag
 - lives
 - eliminated flag
 - current-stage submission metadata
@@ -143,15 +145,21 @@ Character IDs are canonical lowercase identifiers: `nadir`, `zayd`, `jolyne`, `d
 
 Duplicate character selection is allowed in the first milestone so room capacity is not blocked by roster contention.
 
-## 6. Round State Machine
+## 6. Room and Round State Machine
 
 ### Lobby
 
-Players join, reconnect, choose character, and mark ready. Host can change settings while no round is active.
+Players may join, reconnect, choose character, and mark ready. Host may change settings while no round is active.
+
+A new player join is accepted only while room status is `lobby` or `finished`. New joins during `countdown`, `stage-open`, or `stage-reveal` are rejected with `ROUND_IN_PROGRESS`. Existing players may still restore their own sessions during an active round.
 
 ### Countdown
 
-Host starts the round. Server freezes the participant list, creates a new `roundId`, initializes lives, generates the full hidden bridge path, and emits a 3-second countdown.
+Host starts the round from `lobby` or `finished` only when at least one connected player is present and every connected, non-expired player is ready.
+
+Server freezes the participant list for that round, creates a new `roundId`, initializes lives, generates the full hidden bridge path, and emits a 3-second countdown.
+
+Players who were not part of the frozen participant list cannot enter that round.
 
 ### Stage open
 
@@ -163,13 +171,13 @@ Server publishes:
 - alive player list
 - submitted-player count
 
-Each alive player may submit exactly one LEFT or RIGHT choice for that stage.
+Each alive participant may submit exactly one LEFT or RIGHT choice for that stage.
 
 ### Early close
 
-If every alive connected player has submitted, the server may close the decision window before the 8-second deadline.
+The server may close the decision window before the 8-second deadline only when every alive round participant has submitted.
 
-A disconnected player remains eligible until the stage deadline and may reconnect and submit during that window.
+A disconnected alive participant who has not submitted prevents early close and remains eligible until the stage deadline. This guarantees that temporary disconnects do not lose the remainder of an otherwise-open decision window.
 
 ### Deadline behavior
 
@@ -177,7 +185,7 @@ A player who has not submitted by the deadline receives a failed-stage outcome a
 
 ### Reveal
 
-The server reveals the safe side only after the stage is closed. It resolves every alive player in one authoritative operation and emits outcomes to all host/TV/player clients.
+The server reveals the safe side only after the stage is closed. It resolves every alive participant in one authoritative operation and emits outcomes to all host/TV/player clients.
 
 Outcome values are:
 
@@ -196,16 +204,20 @@ If at least one player remains alive and more bridge stages remain, the server i
 
 The round finishes when:
 
-- stage 10 resolves, or
-- all players are eliminated
+- the configured final stage resolves, or
+- all participants are eliminated
 
 Ranking is deterministic:
 
 1. players who survive all stages
 2. then greater furthest-stage progress
 3. then more remaining lives
-4. then earlier final successful submission timestamp
+4. then earlier final successful submission timestamp; players without a successful submission sort after players with one
 5. stable `playerId` ordering as final tie-break
+
+The room enters `finished`, preserves the completed ranking as `lastResult`, clears all ready flags, and permits lobby-style actions again: new joins, character changes, readiness changes, and host settings updates.
+
+A subsequent `host:start-round` creates a fresh round from the currently connected, non-expired players after they are ready. Player name, character, and session identity persist across rounds; lives, elimination, submissions, bridge pattern, and round ID reset.
 
 ## 7. Input Validation and Idempotency
 
@@ -222,6 +234,7 @@ The server rejects:
 
 - unknown room
 - invalid/expired player session
+- player not included in the active round
 - eliminated player
 - wrong round ID
 - stale or future stage index
@@ -248,7 +261,7 @@ On reconnect with a valid room code + session token:
 - the same `playerId`, character, lives, elimination state, and current-stage submission are restored
 - the server emits a full private state snapshot
 
-After 90 seconds disconnected, the session becomes expired. If a round is active, the player slot remains in the round for deterministic ranking but cannot submit future moves. In the lobby, the expired slot is removed.
+After 90 seconds disconnected, the session becomes expired. If a round is active, the player slot remains in that round for deterministic ranking but cannot submit future moves. In `lobby` or `finished`, the expired slot is removed.
 
 Host reconnect has no short grace expiry during the room lifetime. The host token can restore host control from another browser session.
 
@@ -267,6 +280,7 @@ Host reconnect has no short grace expiry during the room lifetime. The host toke
 - Close Room
 - current stage/deadline/submission count
 - player lives and elimination state
+- previous round result while room remains open
 
 Host controls are authenticated by the host token. The token is never broadcast to TV/player clients and is stored only in host browser storage plus hashed server memory.
 
@@ -278,7 +292,7 @@ Mid-stage pause is intentionally excluded from the first milestone because it co
 
 It displays:
 
-- room code while in lobby
+- room code while in lobby/post-round state
 - roster and readiness
 - countdown
 - all player characters on the bridge
@@ -308,6 +322,8 @@ TV clients never receive host or player session tokens.
 After joining, the session token is stored in browser local storage scoped by room code. Reloading the page attempts session restoration before offering a new join.
 
 The phone must not display another player's submitted side before reveal.
+
+Character and ready changes are accepted only in `lobby` or `finished`.
 
 ## 12. Socket Protocol
 
@@ -347,8 +363,10 @@ Stable protocol errors include:
 - `ROOM_NOT_FOUND`
 - `ROOM_FULL`
 - `ROOM_CLOSED`
+- `ROUND_IN_PROGRESS`
 - `HOST_AUTH_FAILED`
 - `PLAYER_AUTH_FAILED`
+- `PLAYER_NOT_IN_ROUND`
 - `PLAYER_NAME_INVALID`
 - `CHARACTER_INVALID`
 - `ROUND_NOT_ACTIVE`
@@ -432,7 +450,9 @@ Cover:
 - room expiry
 - token validation
 - reconnect grace
+- late-join rejection during active rounds
 - stale/duplicate input rejection
+- repeated-round reset semantics
 
 ### Multi-client integration test
 
@@ -443,13 +463,17 @@ Start the real server on an ephemeral port and use Socket.IO clients to:
 3. attach a TV spectator
 4. ready players
 5. start a round
-6. verify unresolved safe side is absent from public payloads
-7. submit simultaneous moves
-8. verify duplicate/stale moves are rejected
-9. verify reveal is synchronized
-10. disconnect and restore a player session
-11. complete/end the round
-12. verify final ranking and room cleanup behavior
+6. verify a new join is rejected while the round is active
+7. verify unresolved safe side is absent from public payloads
+8. submit simultaneous moves
+9. verify a disconnected, non-submitted participant prevents unfair early close until it submits or the deadline expires
+10. verify duplicate/stale moves are rejected
+11. verify reveal is synchronized
+12. disconnect and restore a player session
+13. complete/end the round
+14. verify final ranking
+15. re-ready players and start a second round to verify reset behavior
+16. verify room cleanup behavior
 
 ### Existing preflight
 
@@ -499,18 +523,21 @@ This is a party-game security model, not a financial/authentication platform. No
 The multiplayer foundation is complete when:
 
 1. a host can create a room and receive a 5-character code
-2. six browser clients can join the room
+2. six browser clients can join the room while it is joinable
 3. a TV client can spectate the same authoritative state
 4. the host can start a 10-stage round
-5. each alive player can submit one private LEFT/RIGHT choice per stage
-6. safe side is not leaked before server reveal
-7. all choices resolve simultaneously
-8. lives/elimination/ranking are server authoritative
-9. stale, duplicate, replayed, or unauthenticated inputs are rejected
-10. a disconnected player can restore the same session within 90 seconds
-11. the full integration test passes under GitHub Actions
-12. existing Frostbridge static preflight remains green
-13. a successful CI run produces a deployable package artifact
+5. late new joins are rejected while an active round is in progress
+6. each alive round participant can submit one private LEFT/RIGHT choice per stage
+7. safe side is not leaked before server reveal
+8. a disconnected participant does not lose an open stage before its deadline solely because connected players submitted early
+9. all choices resolve simultaneously
+10. lives/elimination/ranking are server authoritative
+11. stale, duplicate, replayed, or unauthenticated inputs are rejected
+12. a disconnected player can restore the same session within 90 seconds
+13. a completed room can run a second clean round without recreating the room
+14. the full integration test passes under GitHub Actions
+15. existing Frostbridge static preflight remains green
+16. a successful CI run produces a deployable package artifact
 
 ## 21. Explicit Follow-on Phases
 
