@@ -68,8 +68,7 @@ def validate_svg_files() -> None:
 
 
 def validate_html() -> str:
-    html_path = ROOT / "index.html"
-    html = html_path.read_text(encoding="utf-8")
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
 
     for dom_id in REQUIRED_DOM_IDS:
         if f'id="{dom_id}"' not in html and f"id='{dom_id}'" not in html:
@@ -107,7 +106,12 @@ def validate_html() -> str:
             fail(f"Forbidden/private dependency found in index.html: {marker}")
 
     refs = re.findall(r'''(?:src|href)=["']([^"']+)["']''', html, flags=re.I)
+    checked = 0
     for ref in refs:
+        # Template expressions such as ${c.img} are dynamic JS-generated markup.
+        # Their concrete character paths are validated through REQUIRED_FILES.
+        if "${" in ref:
+            continue
         if ref.startswith(("http://", "https://", "#", "mailto:", "tel:")):
             continue
         target = (ROOT / ref.split("?", 1)[0].split("#", 1)[0]).resolve()
@@ -117,8 +121,9 @@ def validate_html() -> str:
             fail(f"Asset reference escapes repository root: {ref}")
         if not target.exists():
             fail(f"Broken local asset reference: {ref}")
+        checked += 1
 
-    ok(f"HTML/game integrity passed ({len(refs)} static asset links checked)")
+    ok(f"HTML/game integrity passed ({checked} concrete local asset links checked)")
     return html
 
 
@@ -139,13 +144,18 @@ def validate_javascript(html: str) -> None:
     if not scripts:
         fail("No inline JavaScript found")
     js = "\n".join(scripts)
-    node = subprocess.run(
-        ["node", "--check", "-"],
-        input=js,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as handle:
+        handle.write(js)
+        js_path = Path(handle.name)
+    try:
+        node = subprocess.run(
+            ["node", "--check", str(js_path)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+    finally:
+        js_path.unlink(missing_ok=True)
     if node.returncode != 0:
         print(node.stdout)
         fail("JavaScript syntax validation failed")
@@ -153,37 +163,36 @@ def validate_javascript(html: str) -> None:
 
 
 def smoke_http() -> None:
-    with tempfile.TemporaryDirectory() as _:
-        server = subprocess.Popen(
-            [sys.executable, "-m", "http.server", "8765", "--bind", "127.0.0.1"],
-            cwd=ROOT,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        try:
-            import time
-            deadline = time.time() + 8
-            last_error: Exception | None = None
-            while time.time() < deadline:
-                try:
-                    with urllib.request.urlopen("http://127.0.0.1:8765/index.html", timeout=2) as response:
-                        body = response.read().decode("utf-8")
-                        if response.status != 200:
-                            fail(f"HTTP smoke returned status {response.status}")
-                        if "Rushline Rebels" not in body or "FROST" not in body:
-                            fail("HTTP smoke returned unexpected page content")
-                        ok("Local HTTP smoke test passed")
-                        return
-                except Exception as exc:  # server may still be starting
-                    last_error = exc
-                    time.sleep(0.2)
-            fail(f"HTTP smoke test failed: {last_error}")
-        finally:
-            server.terminate()
+    server = subprocess.Popen(
+        [sys.executable, "-m", "http.server", "8765", "--bind", "127.0.0.1"],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        import time
+        deadline = time.time() + 8
+        last_error: Exception | None = None
+        while time.time() < deadline:
             try:
-                server.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                server.kill()
+                with urllib.request.urlopen("http://127.0.0.1:8765/index.html", timeout=2) as response:
+                    body = response.read().decode("utf-8")
+                    if response.status != 200:
+                        fail(f"HTTP smoke returned status {response.status}")
+                    if "Rushline Rebels" not in body or "FROST" not in body:
+                        fail("HTTP smoke returned unexpected page content")
+                    ok("Local HTTP smoke test passed")
+                    return
+            except Exception as exc:  # server may still be starting
+                last_error = exc
+                time.sleep(0.2)
+        fail(f"HTTP smoke test failed: {last_error}")
+    finally:
+        server.terminate()
+        try:
+            server.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            server.kill()
 
 
 def main() -> None:
