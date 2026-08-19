@@ -1,1 +1,57 @@
+name: Frostbridge Preflight
 
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frostbridge-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Static + runtime smoke preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Frostbridge preflight
+        run: python scripts/preflight.py
+
+      - name: Build static release package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp index.html README.md dist/
+          cp -R assets dist/assets
+          cp -R scripts dist/scripts
+          tar -czf frostbridge-static-${GITHUB_SHA::7}.tar.gz -C dist .
+
+      - name: Upload preflight package
+        uses: actions/upload-artifact@v4
+        with:
+          name: frostbridge-static-${{ github.sha }}
+          path: frostbridge-static-*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
