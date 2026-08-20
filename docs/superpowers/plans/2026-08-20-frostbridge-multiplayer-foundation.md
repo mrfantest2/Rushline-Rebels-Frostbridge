@@ -4,7 +4,7 @@
 
 **Goal:** Build the first production multiplayer Frostbridge milestone: one host-authoritative Node.js server, room-code joining, synchronized TV/player/host surfaces, reconnect restoration, simultaneous hidden LEFT/RIGHT decisions, and a CI gate that proves the full flow.
 
-**Architecture:** A single Node.js 22 process runs Express and Socket.IO. The server owns rooms, hidden bridge patterns, round/stage timers, player lives, ranking, authentication tokens, and all state transitions; browser clients only render state and submit intent. The first milestone keeps room state in memory and is intentionally single-process so no shared datastore or sticky-session layer is required.
+**Architecture:** A single Node.js 22 process runs Express and Socket.IO. The server owns rooms, hidden bridge patterns, round/stage timers, player lives, ranking, authentication tokens, and all state transitions; browser clients only render state and submit intent. Room state remains in memory and the milestone is intentionally single-process.
 
 **Tech Stack:** Node.js 22, ECMAScript modules, Express, Socket.IO, Socket.IO Client, Node built-in `node:test`, Python 3.12 preflight, GitHub Actions.
 
@@ -22,10 +22,10 @@
 - Player reconnect grace is 90 seconds.
 - Host actions require a host token; player actions require a player session token; raw tokens are never logged and are stored hashed server-side.
 - Room code alone never authorizes host or player mutation.
-- Duplicate/stale/replayed inputs never mutate state.
-- Players who join during an active round enter as spectators and become eligible only after the room returns to lobby.
-- A disconnected alive player prevents early stage close until either they submit after reconnect or the stage deadline expires.
-- Passing CI is required before the multiplayer foundation can merge to `main`.
+- Duplicate, stale, replayed, or unauthenticated inputs never mutate state.
+- Players joining during an active round are spectator-only until the room returns to lobby.
+- A disconnected alive player prevents early stage close until that player submits after reconnect or the deadline expires.
+- Passing CI is required before merge to `main`.
 
 ---
 
@@ -35,17 +35,17 @@
 package.json
 package-lock.json
 server/
-  app.js                # HTTP + Socket.IO composition and process entrypoint
-  config.js             # environment/default configuration
-  protocol.js           # event names, protocol version, stable error codes
-  validators.js         # payload/name/code/character/settings validation
-  session-manager.js    # token issue/hash/verify and restore helpers
-  game-engine.js        # authoritative round/stage state machine
-  room-manager.js       # room lifecycle, joins, readiness, expiry, snapshots
-  socket-gateway.js     # Socket.IO handlers and authorization boundary
-  logger.js             # structured safe logging without tokens
+  app.js
+  config.js
+  protocol.js
+  validators.js
+  session-manager.js
+  game-engine.js
+  room-manager.js
+  socket-gateway.js
+  logger.js
 public/
-  index.html             # existing standalone landing/demo moved under static root
+  index.html
   host/index.html
   host/host.js
   tv/index.html
@@ -55,7 +55,7 @@ public/
   shared/socket.js
   shared/ui.css
 assets/
-  characters/            # existing assets stay canonical here
+  characters/
   mockups/
 tests/
   helpers/test-clock.js
@@ -64,16 +64,18 @@ tests/
   session-manager.test.js
   game-engine.test.js
   room-manager.test.js
+  protocol.test.js
   multiplayer.integration.test.js
 scripts/preflight.py
 .github/workflows/main.yml
 README.md
 PRE-FLIGHT.md
+.gitignore
 ```
 
 ---
 
-### Task 1: Node Runtime, Protocol Constants, Validation, and Test Harness
+### Task 1: Runtime, Protocol Constants, Validation, and Test Harness
 
 **Files:**
 - Create: `package.json`
@@ -84,48 +86,40 @@ PRE-FLIGHT.md
 - Create after install: `package-lock.json`
 
 **Interfaces:**
-- Produces: `PROTOCOL_VERSION`, `EVENTS`, `ERROR_CODES`, `CHARACTER_IDS`, `DEFAULT_SETTINGS`.
-- Produces: `validateRoomCode(value)`, `validateDisplayName(value)`, `validateCharacterId(value)`, `validateMovePayload(value)`, `validateSettingsPatch(value)` returning `{ ok: true, value }` or `{ ok: false, code }`.
-- Later tasks consume those exact exports.
+- Produces `PROTOCOL_VERSION`, `EVENTS`, `ERROR_CODES`, `CHARACTER_IDS`, `DEFAULT_SETTINGS`.
+- Produces `validateRoomCode(value)`, `validateDisplayName(value)`, `validateCharacterId(value)`, `validateMovePayload(value)`, `validateSettingsPatch(value)` returning `{ ok:true, value }` or `{ ok:false, code }`.
 
-- [ ] **Step 1: Write the failing validator tests**
+- [ ] **Step 1: Write failing validator tests**
 
 ```js
-// tests/validators.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  validateDisplayName,
-  validateCharacterId,
-  validateMovePayload,
-} from '../server/validators.js';
+import { validateDisplayName, validateCharacterId, validateMovePayload } from '../server/validators.js';
 
- test('display name is trimmed and length constrained', () => {
-  assert.deepEqual(validateDisplayName('  Dana  '), { ok: true, value: 'Dana' });
+test('display name is trimmed and constrained', () => {
+  assert.deepEqual(validateDisplayName('  Dana  '), { ok:true, value:'Dana' });
   assert.equal(validateDisplayName('').ok, false);
   assert.equal(validateDisplayName('x'.repeat(33)).ok, false);
 });
 
 test('character id accepts only canonical rebels', () => {
-  assert.deepEqual(validateCharacterId('dana'), { ok: true, value: 'dana' });
+  assert.deepEqual(validateCharacterId('dana'), { ok:true, value:'dana' });
   assert.equal(validateCharacterId('layla').ok, false);
 });
 
-test('move payload constrains round stage sequence and side', () => {
-  const good = validateMovePayload({ roundId: 'r1', stageIndex: 2, inputSeq: 7, side: 'L' });
-  assert.equal(good.ok, true);
-  assert.equal(validateMovePayload({ roundId: 'r1', stageIndex: 2, inputSeq: 7, side: 'X' }).ok, false);
-  assert.equal(validateMovePayload({ roundId: 'r1', stageIndex: -1, inputSeq: 7, side: 'L' }).ok, false);
+test('move payload constrains round, stage, sequence, and side', () => {
+  assert.equal(validateMovePayload({roundId:'r1',stageIndex:2,inputSeq:7,side:'L'}).ok, true);
+  assert.equal(validateMovePayload({roundId:'r1',stageIndex:2,inputSeq:7,side:'X'}).ok, false);
 });
 ```
 
-- [ ] **Step 2: Run the tests and verify failure**
+- [ ] **Step 2: Run and verify failure**
 
 Run: `npm test -- tests/validators.test.js`
 
-Expected: FAIL because `server/validators.js` and protocol/config exports do not exist.
+Expected: FAIL because the modules do not exist.
 
-- [ ] **Step 3: Add runtime manifest and minimal protocol/config implementation**
+- [ ] **Step 3: Add the Node manifest and protocol/config exports**
 
 ```json
 {
@@ -151,75 +145,61 @@ Expected: FAIL because `server/validators.js` and protocol/config exports do not
 
 ```js
 // server/protocol.js
-export const PROTOCOL_VERSION = 1;
-export const CHARACTER_IDS = Object.freeze(['nadir','zayd','jolyne','dana','sami','rami']);
-export const ERROR_CODES = Object.freeze({
-  ROOM_NOT_FOUND: 'ROOM_NOT_FOUND', ROOM_FULL: 'ROOM_FULL', ROOM_CLOSED: 'ROOM_CLOSED',
-  HOST_AUTH_FAILED: 'HOST_AUTH_FAILED', PLAYER_AUTH_FAILED: 'PLAYER_AUTH_FAILED',
-  PLAYER_NAME_INVALID: 'PLAYER_NAME_INVALID', CHARACTER_INVALID: 'CHARACTER_INVALID',
-  ROUND_NOT_ACTIVE: 'ROUND_NOT_ACTIVE', ROUND_ID_STALE: 'ROUND_ID_STALE',
-  STAGE_STALE: 'STAGE_STALE', STAGE_CLOSED: 'STAGE_CLOSED', PLAYER_ELIMINATED: 'PLAYER_ELIMINATED',
-  MOVE_ALREADY_SUBMITTED: 'MOVE_ALREADY_SUBMITTED', INPUT_REPLAYED: 'INPUT_REPLAYED',
-  PROTOCOL_VERSION_UNSUPPORTED: 'PROTOCOL_VERSION_UNSUPPORTED', SETTINGS_INVALID: 'SETTINGS_INVALID'
+export const PROTOCOL_VERSION=1;
+export const CHARACTER_IDS=Object.freeze(['nadir','zayd','jolyne','dana','sami','rami']);
+export const ERROR_CODES=Object.freeze({
+  ROOM_NOT_FOUND:'ROOM_NOT_FOUND',ROOM_FULL:'ROOM_FULL',ROOM_CLOSED:'ROOM_CLOSED',
+  HOST_AUTH_FAILED:'HOST_AUTH_FAILED',PLAYER_AUTH_FAILED:'PLAYER_AUTH_FAILED',
+  PLAYER_NAME_INVALID:'PLAYER_NAME_INVALID',CHARACTER_INVALID:'CHARACTER_INVALID',
+  ROUND_NOT_ACTIVE:'ROUND_NOT_ACTIVE',ROUND_ID_STALE:'ROUND_ID_STALE',STAGE_STALE:'STAGE_STALE',
+  STAGE_CLOSED:'STAGE_CLOSED',PLAYER_ELIMINATED:'PLAYER_ELIMINATED',
+  MOVE_ALREADY_SUBMITTED:'MOVE_ALREADY_SUBMITTED',INPUT_REPLAYED:'INPUT_REPLAYED',
+  PROTOCOL_VERSION_UNSUPPORTED:'PROTOCOL_VERSION_UNSUPPORTED',SETTINGS_INVALID:'SETTINGS_INVALID'
 });
-export const EVENTS = Object.freeze({
-  HOST_CREATE_ROOM:'host:create-room', HOST_RESTORE:'host:restore', HOST_UPDATE_SETTINGS:'host:update-settings',
-  HOST_START_ROUND:'host:start-round', HOST_END_ROUND:'host:end-round', HOST_CLOSE_ROOM:'host:close-room',
-  TV_WATCH:'tv:watch', PLAYER_JOIN:'player:join', PLAYER_RESTORE:'player:restore',
-  PLAYER_SET_CHARACTER:'player:set-character', PLAYER_SET_READY:'player:set-ready', PLAYER_MOVE:'player:move',
-  ROOM_SNAPSHOT:'room:snapshot', ROOM_CLOSED:'room:closed', PLAYER_PRIVATE_STATE:'player:private-state',
-  ROUND_COUNTDOWN:'round:countdown', STAGE_OPEN:'stage:open', STAGE_SUBMISSION_COUNT:'stage:submission-count',
-  STAGE_REVEAL:'stage:reveal', ROUND_FINISHED:'round:finished', SERVER_ERROR:'server:error'
+export const EVENTS=Object.freeze({
+  HOST_CREATE_ROOM:'host:create-room',HOST_RESTORE:'host:restore',HOST_UPDATE_SETTINGS:'host:update-settings',
+  HOST_START_ROUND:'host:start-round',HOST_END_ROUND:'host:end-round',HOST_CLOSE_ROOM:'host:close-room',
+  TV_WATCH:'tv:watch',PLAYER_JOIN:'player:join',PLAYER_RESTORE:'player:restore',
+  PLAYER_SET_CHARACTER:'player:set-character',PLAYER_SET_READY:'player:set-ready',PLAYER_MOVE:'player:move',
+  ROOM_SNAPSHOT:'room:snapshot',ROOM_CLOSED:'room:closed',PLAYER_PRIVATE_STATE:'player:private-state',
+  ROUND_COUNTDOWN:'round:countdown',STAGE_OPEN:'stage:open',STAGE_SUBMISSION_COUNT:'stage:submission-count',
+  STAGE_REVEAL:'stage:reveal',ROUND_FINISHED:'round:finished',SERVER_ERROR:'server:error'
 });
 ```
 
 ```js
 // server/config.js
-export const DEFAULT_SETTINGS = Object.freeze({ maxPlayers:6, stageCount:10, startingLives:3, decisionMs:8000, revealMs:1800, countdownMs:3000 });
-export const CONFIG = Object.freeze({
-  port: Number(process.env.PORT || 3000),
-  maxRooms: Number(process.env.MAX_ROOMS || 100),
-  reconnectGraceMs: 90_000,
-  inactiveExpiryMs: 30 * 60_000,
-  hardRoomLifetimeMs: 4 * 60 * 60_000,
+export const DEFAULT_SETTINGS=Object.freeze({maxPlayers:6,stageCount:10,startingLives:3,decisionMs:8000,revealMs:1800,countdownMs:3000});
+export const CONFIG=Object.freeze({
+  port:Number(process.env.PORT||3000),maxRooms:Number(process.env.MAX_ROOMS||100),
+  reconnectGraceMs:90_000,inactiveExpiryMs:30*60_000,hardRoomLifetimeMs:4*60*60_000
 });
 ```
 
-- [ ] **Step 4: Implement validators with stable error results**
+- [ ] **Step 4: Implement validators**
 
 ```js
-// server/validators.js
 import { CHARACTER_IDS, ERROR_CODES } from './protocol.js';
 import { DEFAULT_SETTINGS } from './config.js';
-const ok = value => ({ ok:true, value });
-const bad = code => ({ ok:false, code });
-export function validateDisplayName(value){
-  if(typeof value !== 'string') return bad(ERROR_CODES.PLAYER_NAME_INVALID);
-  const name=value.trim();
-  return name.length >= 1 && name.length <= 32 ? ok(name) : bad(ERROR_CODES.PLAYER_NAME_INVALID);
-}
-export function validateCharacterId(value){ return CHARACTER_IDS.includes(value) ? ok(value) : bad(ERROR_CODES.CHARACTER_INVALID); }
-export function validateRoomCode(value){
-  const code=String(value||'').trim().toUpperCase();
-  return /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(code) ? ok(code) : bad(ERROR_CODES.ROOM_NOT_FOUND);
-}
-export function validateMovePayload(v){
-  if(!v || typeof v.roundId!=='string' || !Number.isInteger(v.stageIndex) || v.stageIndex<0 || !Number.isSafeInteger(v.inputSeq) || v.inputSeq<0 || !['L','R'].includes(v.side)) return bad(ERROR_CODES.STAGE_STALE);
-  return ok({ roundId:v.roundId, stageIndex:v.stageIndex, inputSeq:v.inputSeq, side:v.side });
-}
+const ok=value=>({ok:true,value});
+const bad=code=>({ok:false,code});
+export function validateDisplayName(v){if(typeof v!=='string')return bad(ERROR_CODES.PLAYER_NAME_INVALID);const x=v.trim();return x.length>=1&&x.length<=32?ok(x):bad(ERROR_CODES.PLAYER_NAME_INVALID);}
+export function validateCharacterId(v){return CHARACTER_IDS.includes(v)?ok(v):bad(ERROR_CODES.CHARACTER_INVALID);}
+export function validateRoomCode(v){const x=String(v||'').trim().toUpperCase();return /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(x)?ok(x):bad(ERROR_CODES.ROOM_NOT_FOUND);}
+export function validateMovePayload(v){if(!v||typeof v.roundId!=='string'||!Number.isInteger(v.stageIndex)||v.stageIndex<0||!Number.isSafeInteger(v.inputSeq)||v.inputSeq<0||!['L','R'].includes(v.side))return bad(ERROR_CODES.STAGE_STALE);return ok({roundId:v.roundId,stageIndex:v.stageIndex,inputSeq:v.inputSeq,side:v.side});}
 export function validateSettingsPatch(v){
-  if(!v || typeof v!=='object') return bad(ERROR_CODES.SETTINGS_INVALID);
-  const next={...DEFAULT_SETTINGS,...v};
-  const valid=Number.isInteger(next.stageCount)&&next.stageCount>=1&&next.stageCount<=30&&Number.isInteger(next.startingLives)&&next.startingLives>=1&&next.startingLives<=9&&Number.isInteger(next.decisionMs)&&next.decisionMs>=2000&&next.decisionMs<=30000;
-  return valid ? ok(next) : bad(ERROR_CODES.SETTINGS_INVALID);
+  if(!v||typeof v!=='object')return bad(ERROR_CODES.SETTINGS_INVALID);
+  const x={...DEFAULT_SETTINGS,...v};
+  const valid=Number.isInteger(x.maxPlayers)&&x.maxPlayers>=1&&x.maxPlayers<=6&&Number.isInteger(x.stageCount)&&x.stageCount>=1&&x.stageCount<=30&&Number.isInteger(x.startingLives)&&x.startingLives>=1&&x.startingLives<=9&&Number.isInteger(x.decisionMs)&&x.decisionMs>=2000&&x.decisionMs<=30000&&Number.isInteger(x.revealMs)&&x.revealMs>=250&&x.revealMs<=10000&&Number.isInteger(x.countdownMs)&&x.countdownMs>=0&&x.countdownMs<=10000;
+  return valid?ok(x):bad(ERROR_CODES.SETTINGS_INVALID);
 }
 ```
 
-- [ ] **Step 5: Install dependencies and run the validator tests**
+- [ ] **Step 5: Install and run tests**
 
 Run: `npm install && npm test -- tests/validators.test.js`
 
-Expected: PASS and `package-lock.json` is generated.
+Expected: PASS and lockfile generated.
 
 - [ ] **Step 6: Commit**
 
@@ -230,61 +210,46 @@ git commit -m "feat: establish Frostbridge multiplayer protocol"
 
 ---
 
-### Task 2: Session Tokens and Safe Authentication State
+### Task 2: Session Credentials
 
 **Files:**
 - Create: `server/session-manager.js`
 - Create: `tests/session-manager.test.js`
 
 **Interfaces:**
-- Produces: `issueToken()` → raw token string.
-- Produces: `hashToken(rawToken)` → SHA-256 hex digest.
-- Produces: `verifyToken(rawToken, expectedDigest)` → boolean using constant-time comparison.
-- Produces: `createCredential()` → `{ token, digest }`.
+- `issueToken()` → raw string.
+- `hashToken(rawToken)` → SHA-256 hex.
+- `verifyToken(rawToken, expectedDigest)` → boolean.
+- `createCredential()` → `{ token, digest }`.
 
-- [ ] **Step 1: Write failing session tests**
+- [ ] **Step 1: Write failing credential tests**
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCredential, verifyToken } from '../server/session-manager.js';
-
-test('issued token verifies only against its own digest', () => {
-  const a=createCredential();
-  const b=createCredential();
-  assert.notEqual(a.token,b.token);
-  assert.equal(verifyToken(a.token,a.digest),true);
-  assert.equal(verifyToken(b.token,a.digest),false);
-});
+test('credential verifies only its own token',()=>{const a=createCredential(),b=createCredential();assert.notEqual(a.token,b.token);assert.equal(verifyToken(a.token,a.digest),true);assert.equal(verifyToken(b.token,a.digest),false);});
 ```
 
 - [ ] **Step 2: Run and verify failure**
 
 Run: `npm test -- tests/session-manager.test.js`
 
-Expected: FAIL because the module does not exist.
+Expected: FAIL because module is absent.
 
-- [ ] **Step 3: Implement token issue/hash/verify**
+- [ ] **Step 3: Implement secure token helpers**
 
 ```js
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 export const issueToken=()=>randomBytes(32).toString('base64url');
 export const hashToken=t=>createHash('sha256').update(t).digest('hex');
-export function verifyToken(raw,digest){
-  if(typeof raw!=='string'||typeof digest!=='string') return false;
-  const a=Buffer.from(hashToken(raw),'hex'), b=Buffer.from(digest,'hex');
-  return a.length===b.length && timingSafeEqual(a,b);
-}
-export function createCredential(){ const token=issueToken(); return { token, digest:hashToken(token) }; }
+export function verifyToken(raw,digest){if(typeof raw!=='string'||typeof digest!=='string')return false;const a=Buffer.from(hashToken(raw),'hex'),b=Buffer.from(digest,'hex');return a.length===b.length&&timingSafeEqual(a,b);}
+export function createCredential(){const token=issueToken();return {token,digest:hashToken(token)};}
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **Step 4: Run tests and commit**
 
 Run: `npm test -- tests/session-manager.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
 
 ```bash
 git add server/session-manager.js tests/session-manager.test.js
@@ -301,78 +266,51 @@ git commit -m "feat: add multiplayer session credentials"
 - Create: `tests/game-engine.test.js`
 
 **Interfaces:**
-- Produces class `GameEngine`.
+- Class `GameEngine`.
 - Constructor: `new GameEngine({ settings, randomSide, now })`.
-- Methods: `startRound(players)`, `openStage()`, `submitMove({ playerId, roundId, stageIndex, inputSeq, side })`, `resolveStage(reason)`, `endRound(reason)`.
-- Produces public methods: `publicRoundState()`, `privatePlayerState(playerId)`.
-- Emits no network events itself; room manager/gateway call it and publish returned transition objects.
+- Methods: `startRound(players)`, `openStage()`, `submitMove(input)`, `resolveStage(reason)`, `endRound(reason)`, `publicRoundState()`, `privatePlayerState(playerId)`.
+- Engine never emits network events and never exposes unresolved hidden pattern.
 
-- [ ] **Step 1: Write failing tests for hidden pattern and simultaneous resolution**
+- [ ] **Step 1: Write failing secrecy and resolution tests**
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameEngine } from '../server/game-engine.js';
 const settings={stageCount:2,startingLives:2,decisionMs:8000,revealMs:10,countdownMs:0};
-
-test('public state never exposes unresolved safe side',()=>{
-  const engine=new GameEngine({settings,randomSide:()=> 'L',now:()=>1000});
-  engine.startRound([{playerId:'p1'}]);
-  engine.openStage();
-  assert.equal(JSON.stringify(engine.publicRoundState()).includes('"safeSide"'),false);
-});
-
-test('stage resolves all submitted players together',()=>{
-  const engine=new GameEngine({settings,randomSide:()=> 'L',now:()=>1000});
-  engine.startRound([{playerId:'p1'},{playerId:'p2'}]); engine.openStage();
-  const id=engine.publicRoundState().roundId;
-  assert.equal(engine.submitMove({playerId:'p1',roundId:id,stageIndex:0,inputSeq:1,side:'L'}).ok,true);
-  assert.equal(engine.submitMove({playerId:'p2',roundId:id,stageIndex:0,inputSeq:1,side:'R'}).ok,true);
-  const reveal=engine.resolveStage('all-submitted');
-  assert.equal(reveal.safeSide,'L');
-  assert.equal(reveal.outcomes.p1,'safe');
-  assert.equal(reveal.outcomes.p2,'broken');
-});
+test('public state hides unresolved safe side',()=>{const e=new GameEngine({settings,randomSide:()=> 'L',now:()=>1000});e.startRound([{playerId:'p1'}]);e.openStage();assert.equal(JSON.stringify(e.publicRoundState()).includes('safeSide'),false);});
+test('resolution applies all submitted choices together',()=>{const e=new GameEngine({settings,randomSide:()=> 'L',now:()=>1000});e.startRound([{playerId:'p1'},{playerId:'p2'}]);e.openStage();const id=e.publicRoundState().roundId;e.submitMove({playerId:'p1',roundId:id,stageIndex:0,inputSeq:1,side:'L'});e.submitMove({playerId:'p2',roundId:id,stageIndex:0,inputSeq:1,side:'R'});const x=e.resolveStage('all-submitted');assert.equal(x.safeSide,'L');assert.equal(x.outcomes.p1,'safe');assert.equal(x.outcomes.p2,'broken');});
 ```
 
 - [ ] **Step 2: Run and verify failure**
 
 Run: `npm test -- tests/game-engine.test.js`
 
-Expected: FAIL because `GameEngine` is missing.
+- [ ] **Step 3: Implement state machine and input guards**
 
-- [ ] **Step 3: Implement the state machine minimally**
-
-Implementation must store hidden pattern in a private field, create `roundId` with `crypto.randomUUID()`, track player lives/elimination/submission/inputSeq, reject wrong round/stage/replay/second submission, apply timeout loss for missing submissions, and return reveal payload only from `resolveStage()`.
-
-Core submission shape:
+`submitMove()` must use this rejection order: inactive round → stale round → stale stage → missing/eliminated player → replayed sequence → already-submitted move. A successful move stores only server-private choice state.
 
 ```js
 submitMove(input){
-  if(!this.#round || this.#round.status!=='stage-open') return {ok:false,code:ERROR_CODES.ROUND_NOT_ACTIVE};
-  if(input.roundId!==this.#round.roundId) return {ok:false,code:ERROR_CODES.ROUND_ID_STALE};
-  if(input.stageIndex!==this.#round.stageIndex) return {ok:false,code:ERROR_CODES.STAGE_STALE};
+  if(!this.#round||this.#round.status!=='stage-open')return {ok:false,code:ERROR_CODES.ROUND_NOT_ACTIVE};
+  if(input.roundId!==this.#round.roundId)return {ok:false,code:ERROR_CODES.ROUND_ID_STALE};
+  if(input.stageIndex!==this.#round.stageIndex)return {ok:false,code:ERROR_CODES.STAGE_STALE};
   const p=this.#round.players.get(input.playerId);
-  if(!p || p.eliminated) return {ok:false,code:ERROR_CODES.PLAYER_ELIMINATED};
-  if(input.inputSeq<=p.lastInputSeq) return {ok:false,code:ERROR_CODES.INPUT_REPLAYED};
-  if(p.submission) return {ok:false,code:ERROR_CODES.MOVE_ALREADY_SUBMITTED};
-  p.lastInputSeq=input.inputSeq;
-  p.submission={side:input.side,submittedAt:this.#now()};
+  if(!p||p.eliminated)return {ok:false,code:ERROR_CODES.PLAYER_ELIMINATED};
+  if(input.inputSeq<=p.lastInputSeq)return {ok:false,code:ERROR_CODES.INPUT_REPLAYED};
+  if(p.submission)return {ok:false,code:ERROR_CODES.MOVE_ALREADY_SUBMITTED};
+  p.lastInputSeq=input.inputSeq;p.submission={side:input.side,submittedAt:this.#now()};
   return {ok:true,stageIndex:this.#round.stageIndex};
 }
 ```
 
-- [ ] **Step 4: Add tests for timeout, elimination, ranking, stale input, duplicate input**
+- [ ] **Step 4: Add timeout, elimination, ranking, stale-input, duplicate-input tests**
 
-Add concrete assertions that a timeout loses one life, zero lives eliminates, stale round/stage fails without changing lives, duplicate effective submission fails, and ranking follows survivor/progress/lives/submission/playerId order.
+Assertions must prove timeout loses one life, zero lives eliminates, rejected inputs do not mutate lives/progress, and ranking follows survivor → progress → lives → final-success timestamp → stable playerId.
 
-- [ ] **Step 5: Run engine tests**
+- [ ] **Step 5: Run and commit**
 
 Run: `npm test -- tests/game-engine.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
 
 ```bash
 git add server/game-engine.js tests/helpers/test-clock.js tests/game-engine.test.js
@@ -381,18 +319,18 @@ git commit -m "feat: add authoritative Frostbridge game engine"
 
 ---
 
-### Task 4: Room Manager, Lobby Rules, Reconnect, and Expiry
+### Task 4: Room Manager, Lobby, Reconnect, and Expiry
 
 **Files:**
 - Create: `server/room-manager.js`
 - Create: `tests/room-manager.test.js`
 
 **Interfaces:**
-- Produces class `RoomManager({ config, now, codeGenerator })`.
-- Methods: `createRoom()`, `getRoom(code)`, `joinPlayer(input)`, `restorePlayer(input)`, `setCharacter(input)`, `setReady(input)`, `updateSettings(input)`, `startRound(input)`, `endRound(input)`, `closeRoom(input)`, `markDisconnected(socketId)`, `sweepExpired()`.
-- `createRoom()` returns `{ roomCode, hostToken, room }`.
-- `joinPlayer()` returns `{ playerId, playerToken, roomSnapshot, privateState }`.
-- Public snapshots exclude all token digests and hidden bridge pattern.
+- Class `RoomManager({ config, now, codeGenerator, randomSide })`.
+- Methods: `createRoom()`, `getRoom(code)`, `restoreHost(input)`, `joinPlayer(input)`, `restorePlayer(input)`, `setCharacter(input)`, `setReady(input)`, `updateSettings(input)`, `startRound(input)`, `submitMove(input)`, `endRound(input)`, `closeRoom(input)`, `markDisconnected(socketId)`, `sweepExpired()`.
+- `createRoom()` → `{ roomCode, hostToken, roomSnapshot }`.
+- `joinPlayer()` → `{ playerId, playerToken, roomSnapshot, privateState }`.
+- Public snapshots exclude token digests, raw tokens, private submissions, and hidden pattern.
 
 - [ ] **Step 1: Write failing room lifecycle tests**
 
@@ -400,50 +338,32 @@ git commit -m "feat: add authoritative Frostbridge game engine"
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomManager } from '../server/room-manager.js';
-
-test('room code is unique and host token restores control',()=>{
-  const mgr=new RoomManager({codeGenerator:(()=>{const q=['ABCDE','ABCDE','FGHJK'];return()=>q.shift();})(),now:()=>1000});
-  const a=mgr.createRoom(), b=mgr.createRoom();
-  assert.equal(a.roomCode,'ABCDE'); assert.equal(b.roomCode,'FGHJK');
-  assert.equal(mgr.restoreHost({roomCode:a.roomCode,hostToken:a.hostToken}).ok,true);
-});
-
-test('active-round join becomes next-round spectator',()=>{
-  const mgr=new RoomManager({now:()=>1000});
-  const host=mgr.createRoom();
-  const p1=mgr.joinPlayer({roomCode:host.roomCode,name:'Dana',characterId:'dana'});
-  mgr.setReady({roomCode:host.roomCode,playerToken:p1.playerToken,ready:true});
-  mgr.startRound({roomCode:host.roomCode,hostToken:host.hostToken});
-  const late=mgr.joinPlayer({roomCode:host.roomCode,name:'Rami',characterId:'rami'});
-  assert.equal(late.privateState.roundEligible,false);
-});
+test('code collision retries and host token restores',()=>{const q=['ABCDE','ABCDE','FGHJK'];const m=new RoomManager({codeGenerator:()=>q.shift(),now:()=>1000});const a=m.createRoom(),b=m.createRoom();assert.equal(a.roomCode,'ABCDE');assert.equal(b.roomCode,'FGHJK');assert.equal(m.restoreHost({roomCode:a.roomCode,hostToken:a.hostToken}).ok,true);});
 ```
 
 - [ ] **Step 2: Run and verify failure**
 
 Run: `npm test -- tests/room-manager.test.js`
 
-Expected: FAIL because room manager is missing.
+- [ ] **Step 3: Implement creation, join, auth, readiness, settings, and active-round spectator rule**
 
-- [ ] **Step 3: Implement room creation/join/restore/lobby mutation**
+Use `createCredential()` and store only digests. Enforce 6-player capacity. Joining while status is not lobby sets `roundEligible:false`; eligibility resets after return to lobby.
 
-Use `createCredential()` for host/player credentials. Store only digests. Normalize codes through validators. Enforce `maxPlayers=6`. During active round, new players get `roundEligible:false`; when round returns to lobby, all non-expired players become eligible and ready resets to false.
+- [ ] **Step 4: Implement `submitMove()` delegation and early-close accounting**
 
-- [ ] **Step 4: Implement disconnect/reconnect and expiry semantics**
+`RoomManager.submitMove()` authenticates the player token, validates payload, calls `GameEngine.submitMove()`, and returns `{ok,roomCode,stageIndex,submittedCount,aliveCount,shouldResolve}`. `aliveCount` includes disconnected alive participants, so their absence cannot trigger early reveal.
 
-A disconnected active player retains slot and remains part of `aliveParticipantIds`, so early close checks `submittedCount === aliveParticipantCount`, not merely connected count. `sweepExpired()` removes expired lobby players and closes rooms at inactivity/hard-lifetime limits.
+- [ ] **Step 5: Implement disconnect/restore and expiry**
 
-- [ ] **Step 5: Add tests for full room, 90-second restore, expired restore, early-close fairness, and room expiry**
+Retain disconnected active players for 90 seconds; lobby-expired slots are removed. Active expired players remain deterministic round participants but cannot submit future moves. Sweep inactive rooms at 30 minutes and hard-close at 4 hours.
 
-Use a mutable `now` variable so tests advance time deterministically without sleeping.
+- [ ] **Step 6: Add full-room, reconnect, expired restore, late join, early-close fairness, and room-expiry tests**
 
-- [ ] **Step 6: Run room tests**
+Use a mutable injected clock rather than real sleeping.
+
+- [ ] **Step 7: Run and commit**
 
 Run: `npm test -- tests/room-manager.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
 
 ```bash
 git add server/room-manager.js tests/room-manager.test.js
@@ -452,7 +372,7 @@ git commit -m "feat: add Frostbridge room lifecycle"
 
 ---
 
-### Task 5: Express App and Socket.IO Gateway
+### Task 5: Express Application and Socket Gateway
 
 **Files:**
 - Create: `server/logger.js`
@@ -462,61 +382,48 @@ git commit -m "feat: add Frostbridge room lifecycle"
 - Create: `tests/protocol.test.js`
 
 **Interfaces:**
-- `createApp({ roomManager, config })` returns `{ httpServer, io, start(port), stop() }`.
-- Socket acknowledgements use `{ ok:true, ...data }` or `{ ok:false, code }`.
-- `room:snapshot` is public; `player:private-state` only goes to that player's socket; host private data only returns through authenticated acknowledgements.
+- `createApp({ roomManager, configOverrides } = {})` → `{ httpServer, io, start(port), stop() }`.
+- `start(0)` resolves to actual ephemeral port.
+- Ack shape is `{ok:true,...}` or `{ok:false,code}`.
+- Public `room:snapshot` contains no secrets; `player:private-state` is sent only to that player's socket.
 
-- [ ] **Step 1: Write failing HTTP/protocol tests**
+- [ ] **Step 1: Write failing HTTP/protocol test**
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../server/app.js';
-
-test('health and readiness endpoints answer 200', async t => {
-  const app=createApp(); const port=await app.start(0); t.after(()=>app.stop());
-  const h=await fetch(`http://127.0.0.1:${port}/healthz`);
-  const r=await fetch(`http://127.0.0.1:${port}/readyz`);
-  assert.equal(h.status,200); assert.equal(r.status,200);
-});
+test('health and ready answer 200',async t=>{const app=createApp();const port=await app.start(0);t.after(()=>app.stop());assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status,200);assert.equal((await fetch(`http://127.0.0.1:${port}/readyz`)).status,200);});
 ```
 
 - [ ] **Step 2: Run and verify failure**
 
 Run: `npm test -- tests/protocol.test.js`
 
-Expected: FAIL because app/gateway do not exist.
+- [ ] **Step 3: Implement HTTP composition**
 
-- [ ] **Step 3: Implement Express composition and health routes**
+Serve `public/` at `/`, `assets/` at `/assets`, attach Socket.IO, expose `/healthz` and `/readyz`, and run the room sweeper interval. Logger must redact keys matching `/token|secret|authorization/i`.
 
-`server/app.js` must create an HTTP server, attach Socket.IO, serve `public/` at `/`, serve `/assets` from existing `assets/`, and start a room sweeper interval. `start(0)` returns the actual ephemeral port.
+- [ ] **Step 4: Implement every protocol event**
 
-- [ ] **Step 4: Implement every socket event from the spec**
-
-For each event, validate `protocolVersion`, delegate mutation/authentication to `RoomManager`, acknowledge with stable result, and publish only approved public/private events. `player:move` must never broadcast the submitted side; before reveal it only broadcasts `stage:submission-count`.
-
-Representative handler:
+Each event validates `protocolVersion`, delegates auth/mutation to RoomManager, acknowledges with the stable result, and emits only approved state. `player:move` broadcasts only counts until reveal.
 
 ```js
 socket.on(EVENTS.PLAYER_MOVE,(payload,ack)=>{
   const result=roomManager.submitMove(payload);
   ack(result);
-  if(!result.ok) return;
+  if(!result.ok)return;
   io.to(`room:${result.roomCode}`).emit(EVENTS.STAGE_SUBMISSION_COUNT,{protocolVersion:PROTOCOL_VERSION,stageIndex:result.stageIndex,submittedCount:result.submittedCount,aliveCount:result.aliveCount});
 });
 ```
 
-- [ ] **Step 5: Add protocol tests for unsupported version, host auth failure, player auth failure, and no side leakage**
+- [ ] **Step 5: Add tests for unsupported version, host/player auth failure, stale move, and no pre-reveal leakage**
 
-Tests must inspect emitted JSON and assert unresolved payloads contain neither `safeSide` nor any player's chosen `side`.
+Serialize emitted payloads and assert neither `safeSide` nor a player's submitted `side` appears before `stage:reveal`.
 
-- [ ] **Step 6: Run tests**
+- [ ] **Step 6: Run and commit**
 
 Run: `npm test -- tests/protocol.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
 
 ```bash
 git add server/logger.js server/socket-gateway.js server/app.js tests/helpers/socket-client.js tests/protocol.test.js
@@ -528,7 +435,7 @@ git commit -m "feat: expose Frostbridge realtime server"
 ### Task 6: Host, TV, and Player Browser Surfaces
 
 **Files:**
-- Move/Copy: root `index.html` → `public/index.html`
+- Copy root `index.html` to: `public/index.html`
 - Create: `public/shared/socket.js`
 - Create: `public/shared/ui.css`
 - Create: `public/host/index.html`
@@ -540,42 +447,38 @@ git commit -m "feat: expose Frostbridge realtime server"
 - Modify: `README.md`
 
 **Interfaces:**
-- `public/shared/socket.js` exports `connectSocket()`, `emitAck(event,payload)`, `getProtocolVersion()`.
-- Host stores host token under `localStorage['frostbridge:host:<room>']`.
-- Player stores token under `localStorage['frostbridge:player:<room>']`.
-- TV stores no token.
+- `public/shared/socket.js`: `PROTOCOL_VERSION`, `socket`, `emitAck(event,payload)`.
+- Host token storage key: `frostbridge:host:<room>`.
+- Player token storage key: `frostbridge:player:<room>`.
+- TV stores no credential.
 
-- [ ] **Step 1: Preserve the current landing/demo under `public/index.html`**
+- [ ] **Step 1: Preserve current demo under `public/index.html`**
 
-Update asset paths only as required by the new static root. Confirm `/` still opens the standalone visual demo.
+Adjust asset paths so `/` remains functional when served by Express.
 
-- [ ] **Step 2: Build shared browser socket helper**
+- [ ] **Step 2: Build shared socket helper**
 
 ```js
 export const PROTOCOL_VERSION=1;
 export const socket=io({autoConnect:true});
-export function emitAck(event,payload={}){
-  return new Promise(resolve=>socket.emit(event,{protocolVersion:PROTOCOL_VERSION,...payload},resolve));
-}
+export function emitAck(event,payload={}){return new Promise(resolve=>socket.emit(event,{protocolVersion:PROTOCOL_VERSION,...payload},resolve));}
 ```
 
 - [ ] **Step 3: Build `/host`**
 
-Host page must create/restore room, display room code and join URL, show roster/readiness/connection/lives, expose pre-round settings, start/end/close controls, and render current stage/submission counts. Disable controls when unauthenticated or invalid for current room state.
+Implement create/restore, room code/join URL, roster/readiness/connection/lives, pre-round settings, start/end/close, stage/deadline/submission count. Disable controls when unauthorized or invalid for current state.
 
 - [ ] **Step 4: Build `/tv`**
 
-TV page reads `room` from query string, calls `tv:watch`, renders lobby roster, countdown, bridge stage, submitted-lock indicators, reveal outcomes, lives/eliminations, and final ranking. It must never expose an input control or token storage.
+Read `room` query parameter, call `tv:watch`, render lobby, countdown, bridge, submitted-lock indicators, reveal outcomes, lives/eliminations, ranking. Do not store or request host/player tokens.
 
 - [ ] **Step 5: Build `/play`**
 
-Player page supports room/name/character join, ready toggle, automatic token restore, large LEFT/RIGHT controls while stage is open, locked state after acknowledgement, reveal outcome, lives/elimination, and final placement. Buttons must be disabled after accepted submission and on stale/closed stages.
+Implement code/name/character join, ready, automatic restore, LEFT/RIGHT controller, locked state after accepted move, reveal outcome, lives/elimination, final placement. Disable both choice buttons immediately after accepted ack.
 
-- [ ] **Step 6: Manually smoke static routes through the server**
+- [ ] **Step 6: Smoke routes**
 
-Run: `npm start`
-
-Verify HTTP 200 for `/`, `/host/`, `/tv/?room=ABCDE`, `/play/`, and `/assets/characters/dana.svg`.
+Run `npm start`; verify HTTP 200 for `/`, `/host/`, `/tv/?room=ABCDE`, `/play/`, `/assets/characters/dana.svg`.
 
 - [ ] **Step 7: Commit**
 
@@ -592,55 +495,42 @@ git commit -m "feat: add Frostbridge host tv and phone surfaces"
 - Create: `tests/multiplayer.integration.test.js`
 
 **Interfaces:**
-- Uses real `createApp()` and real `socket.io-client` clients.
-- No mocked Socket.IO transport.
-- Test controls settings with short countdown/reveal/decision durations to keep CI fast while preserving state order.
+- Uses real `createApp({ configOverrides })` and real `socket.io-client` connections.
+- No mocked transport.
 
-- [ ] **Step 1: Write the failing end-to-end test skeleton**
-
-The test must:
+- [ ] **Step 1: Write failing integration skeleton**
 
 ```js
-const app=createApp({ testConfig:{ countdownMs:10,revealMs:10,decisionMs:200 } });
+const app=createApp({configOverrides:{countdownMs:10,revealMs:10,decisionMs:200}});
 const port=await app.start(0);
-const host=await connectTestClient(port);
-const tv=await connectTestClient(port);
-const p1=await connectTestClient(port);
-const p2=await connectTestClient(port);
-const p3=await connectTestClient(port);
+const host=await connectTestClient(port),tv=await connectTestClient(port),p1=await connectTestClient(port),p2=await connectTestClient(port),p3=await connectTestClient(port);
 ```
 
-Then create room, join three players, attach TV, ready players, start round, submit moves, and await reveal.
+Then create room, join players, watch TV, ready, start, submit, and await reveal.
 
-- [ ] **Step 2: Run and verify at least one missing-flow failure before completing helper behavior**
+- [ ] **Step 2: Run and verify missing-flow failure**
 
 Run: `npm test -- tests/multiplayer.integration.test.js`
 
-Expected: FAIL until all required event sequencing and helper waits are implemented.
-
 - [ ] **Step 3: Assert secrecy and idempotency**
 
-Before reveal, serialize every host/TV/player public event and assert it contains neither `safeSide` nor submitted `side`. Submit a duplicate move and a stale `stageIndex` and assert `MOVE_ALREADY_SUBMITTED` / `STAGE_STALE` without state mutation.
+Before reveal, every public event must omit `safeSide` and submitted side. Duplicate and stale moves must return `MOVE_ALREADY_SUBMITTED` and `STAGE_STALE` with no mutation.
 
-- [ ] **Step 4: Assert reconnect restoration**
+- [ ] **Step 4: Assert reconnect**
 
-Disconnect p2 after one resolved stage, reconnect a fresh Socket.IO client, call `player:restore` with its room/token, and assert the same `playerId`, lives, character, elimination state, and round position are restored.
+Disconnect p2, connect a fresh client, call `player:restore`, and assert same `playerId`, character, lives, elimination state, and current round position.
 
-- [ ] **Step 5: Assert active-round late join is spectator-only**
+- [ ] **Step 5: Assert active-round late join**
 
-Join p4 while round is active, assert `roundEligible:false`, and assert `player:move` is rejected for the current round.
+Join p4 during active play, assert `roundEligible:false`, and assert current-round move is rejected.
 
-- [ ] **Step 6: Complete/end round and verify ranking**
+- [ ] **Step 6: Finish/end and verify deterministic ranking plus readiness reset**
 
-Drive remaining stages or use authenticated host end-round path, then assert `round:finished` ranking is deterministic and the room returns to a reusable post-round/lobby state with readiness reset.
+Assert `round:finished`, deterministic order, post-round room reuse, and all existing players reset to not-ready.
 
-- [ ] **Step 7: Run full Node test suite**
+- [ ] **Step 7: Run full suite and commit**
 
 Run: `npm test`
-
-Expected: all unit/protocol/integration tests PASS.
-
-- [ ] **Step 8: Commit**
 
 ```bash
 git add tests/multiplayer.integration.test.js
@@ -649,7 +539,7 @@ git commit -m "test: verify Frostbridge multiplayer end to end"
 
 ---
 
-### Task 8: Extend Preflight, CI, Packaging, and Production Documentation
+### Task 8: Preflight, CI, Packaging, and Documentation
 
 **Files:**
 - Modify: `scripts/preflight.py`
@@ -659,19 +549,19 @@ git commit -m "test: verify Frostbridge multiplayer end to end"
 - Create: `.gitignore`
 
 **Interfaces:**
-- `npm test` is the authoritative multiplayer test command.
-- `python scripts/preflight.py` remains the static/repository gate.
-- CI artifact contains production server, public surfaces, assets, lockfile, README, and excludes tests/node_modules.
+- `npm test` is the multiplayer test gate.
+- `python scripts/preflight.py` remains static/repository/runtime smoke gate.
+- CI artifact contains only deployable runtime/docs/assets.
 
-- [ ] **Step 1: Extend Python preflight required-file validation**
+- [ ] **Step 1: Extend required-file validation**
 
-Add `package.json`, `package-lock.json`, server modules, public host/tv/play/shared files, and integration test to `REQUIRED_FILES`. Keep existing SVG validation and private-monorepo dependency rejection.
+Require package/lockfile, all server modules, all public surfaces/shared files, and the multi-client integration test while preserving SVG validation and private-monorepo dependency rejection.
 
-- [ ] **Step 2: Extend preflight HTTP smoke to launch the Node server**
+- [ ] **Step 2: Change runtime smoke to the real Node server**
 
-Instead of only `python -m http.server`, launch `node server/app.js` with `PORT` assigned from a free local port and verify `/healthz`, `/readyz`, `/`, `/host/`, `/tv/`, `/play/` all return expected content.
+Launch `node server/app.js` on a free port and verify `/healthz`, `/readyz`, `/`, `/host/`, `/tv/`, `/play/`.
 
-- [ ] **Step 3: Update GitHub Actions to install from lockfile and run all gates**
+- [ ] **Step 3: Update GitHub Actions**
 
 ```yaml
 - uses: actions/setup-node@v4
@@ -683,27 +573,13 @@ Instead of only `python -m http.server`, launch `node server/app.js` with `PORT`
 - run: python scripts/preflight.py
 ```
 
-Keep Python 3.12 setup. Package only after both test and preflight steps succeed.
+Keep Python 3.12. Package only after both gates pass.
 
 - [ ] **Step 4: Build deployable artifact**
 
-Artifact staging must include:
-
-```text
-package.json
-package-lock.json
-server/
-public/
-assets/
-README.md
-PRE-FLIGHT.md
-```
-
-Do not include `.git`, `node_modules`, tests, private tokens, or local environment files.
+Include `package.json`, `package-lock.json`, `server/`, `public/`, `assets/`, `README.md`, `PRE-FLIGHT.md`. Exclude `.git`, `node_modules`, tests, environment files, and credentials.
 
 - [ ] **Step 5: Update documentation**
-
-README must document:
 
 ```bash
 npm ci
@@ -713,21 +589,21 @@ npm start
 # Play: http://localhost:3000/play/
 ```
 
-Document `PORT`, `MAX_ROOMS`, single-process limitation, WebSocket reverse-proxy requirement, and that horizontal scale requires shared state/pub-sub first.
+Document `PORT`, `MAX_ROOMS`, single-process limitation, reverse-proxy WebSocket requirement, and shared-state/pub-sub requirement before horizontal scaling.
 
-- [ ] **Step 6: Run complete local gate**
+- [ ] **Step 6: Run complete gate**
 
 Run: `npm ci && npm test && python scripts/preflight.py`
 
 Expected: PASS.
 
-- [ ] **Step 7: Push branch and open production PR**
+- [ ] **Step 7: Open production PR**
 
-PR body must list architecture, security boundary, test coverage, deployment boundary, and explicit deferred features.
+PR body lists architecture, security boundary, test coverage, deployment boundary, and deferred features.
 
-- [ ] **Step 8: Verify GitHub Actions and artifact before merge**
+- [ ] **Step 8: Verify Actions and artifact before merge**
 
-Do not merge until the PR run shows unit tests, multi-client integration, preflight, package creation, and artifact upload all successful.
+Do not merge until unit tests, multi-client integration, preflight, package creation, and artifact upload all succeed.
 
 - [ ] **Step 9: Commit**
 
@@ -740,7 +616,7 @@ git commit -m "ci: gate Frostbridge multiplayer production build"
 
 ## Plan Self-Review Results
 
-- **Spec coverage:** room lifecycle, host/player authentication, hidden pattern, simultaneous decisions, timeout behavior, late joins, reconnect, deterministic ranking, room expiry, three browser surfaces, health/readiness, protocol errors, CI, artifact packaging, and single-process deployment are all mapped to tasks above.
+- **Spec coverage:** room lifecycle, authentication, hidden pattern, simultaneous decisions, timeouts, late joins, reconnect, ranking, expiry, three browser surfaces, health/readiness, protocol errors, CI, packaging, and single-process deployment are mapped to concrete tasks.
 - **Deferred scope preserved:** accounts, database, matchmaking, analytics, character abilities, native clients, alternate modes, and horizontal scaling remain outside this plan.
-- **Type/interface consistency:** `RoomManager`, `GameEngine`, protocol constants, acknowledgement shape, session helpers, and browser protocol version are named consistently across dependent tasks.
-- **Placeholder scan:** no TBD/TODO/"implement later" steps remain; each task includes concrete files, interfaces, test commands, and acceptance behavior.
+- **Interface consistency:** `RoomManager.restoreHost()`, `RoomManager.submitMove()`, `GameEngine`, `createApp({ configOverrides })`, protocol constants, acknowledgement shape, session helpers, and browser protocol version are declared before use and named consistently.
+- **Placeholder scan:** clean; every task contains concrete files, interfaces, commands, and acceptance behavior.
