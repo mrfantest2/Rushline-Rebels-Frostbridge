@@ -21,6 +21,24 @@ function pickRoomSettings(overrides = {}) {
   return Object.fromEntries(ROOM_SETTING_KEYS.filter((key) => overrides[key] !== undefined).map((key) => [key, overrides[key]]));
 }
 
+class ConfiguredRoomManager extends RoomManager {
+  #roomDefaults;
+
+  constructor({ config, roomDefaults }) {
+    super({ config });
+    this.#roomDefaults = roomDefaults;
+  }
+
+  createRoom(input) {
+    const result = super.createRoom(input);
+    if (!result.ok || Object.keys(this.#roomDefaults).length === 0) return result;
+    const room = this.getRoom(result.roomCode);
+    room.settings = { ...room.settings, ...this.#roomDefaults };
+    result.roomSnapshot = this.roomSnapshot(room);
+    return result;
+  }
+}
+
 export function createApp({ roomManager, configOverrides = {}, logger = defaultLogger } = {}) {
   const app = express();
   const httpServer = createServer(app);
@@ -29,12 +47,13 @@ export function createApp({ roomManager, configOverrides = {}, logger = defaultL
     cors: { origin: false },
   });
 
-  const rooms = roomManager || new RoomManager({ config: configOverrides });
+  const roomDefaults = pickRoomSettings(configOverrides);
+  const rooms = roomManager || new ConfiguredRoomManager({ config: configOverrides, roomDefaults });
   const gateway = bindSocketGateway({
     io,
     roomManager: rooms,
     logger,
-    roomSettingsOverrides: pickRoomSettings(configOverrides),
+    roomSettingsOverrides: {},
   });
 
   app.disable('x-powered-by');
