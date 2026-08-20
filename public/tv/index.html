@@ -1,1 +1,46 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Frostbridge TV</title><link rel="stylesheet" href="/shared/ui.css"><style>body{overflow-x:hidden}.tv-grid{display:grid;grid-template-columns:1fr 330px;gap:14px}.arena{min-height:70vh}.tv-code{position:fixed;right:18px;top:14px;z-index:5}.submitted{box-shadow:0 0 0 2px var(--gold)}@media(max-width:850px){.tv-grid{grid-template-columns:1fr}.tv-code{position:static}}</style></head><body><main class="shell"><div class="top"><div class="brand"><div class="mark">RR</div><div><div class="eyebrow">Rushline Rebels</div><b>Frostbridge · TV</b></div></div><div class="pill tv-code">ROOM&nbsp;<b id="roomCode">-----</b></div></div><div class="tv-grid"><section class="card arena"><div class="row" style="justify-content:space-between"><div><div class="eyebrow">Frozen Spillway</div><h1 id="phase">Waiting for room</h1></div><div id="timer" class="timer">--</div></div><div id="bridge" class="bridge"></div></section><aside class="stack"><section class="card"><div class="eyebrow">Rebels</div><div id="roster" class="roster"><p class="muted">Waiting…</p></div></section><section class="card"><div class="eyebrow">Results</div><div id="ranking" class="ranking"><p class="muted">No result yet.</p></div></section></aside></div></main><script src="/socket.io/socket.io.js"></script><script type="module" src="/tv/tv.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Frostbridge TV</title>
+  <link rel="stylesheet" href="/shared/ui.css">
+</head>
+<body>
+  <main class="shell">
+    <div class="screen-frame tv-screen">
+      <header class="tv-hud">
+        <div class="brand"><div class="mark">RR</div><div><div class="eyebrow">Rushline Rebels</div><b>Frostbridge · TV</b></div></div>
+        <div class="tv-hud-center"><div class="eyebrow">Frozen Spillway</div><div class="phase-kicker">Every step is a vote</div></div>
+        <div class="tv-hud-right"><span class="pill tv-code">ROOM&nbsp;<b id="roomCode">-----</b></span></div>
+      </header>
+
+      <div class="tv-stage">
+        <section class="arena-panel glass-panel">
+          <div class="arena-heading">
+            <div><div class="eyebrow">Live round</div><h1 id="phase">Waiting for room</h1></div>
+            <div><div class="eyebrow">Decision clock</div><div id="timer" class="timer">--</div></div>
+          </div>
+          <div class="ambient-line"></div>
+          <div class="bridge-frame"><div id="bridge" class="bridge"></div></div>
+        </section>
+
+        <aside class="tv-sidebar">
+          <section class="player-strip">
+            <div class="eyebrow">Rebels</div>
+            <h2>Live players</h2>
+            <div id="roster" class="roster"><p class="muted">Waiting…</p></div>
+          </section>
+          <section class="tv-results glass-panel">
+            <div class="eyebrow">Results</div>
+            <h2>Frostbridge ranking</h2>
+            <div id="ranking" class="ranking"><p class="muted">No result yet.</p></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/tv/tv.js"></script>
+</body>
+</html>
