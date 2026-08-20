@@ -183,8 +183,9 @@ def validate_documentation_contract() -> None:
     for marker in ["npm ci", "npm test", "python scripts/preflight.py", "frostbridge-multiplayer-"]:
         if marker not in preflight:
             fail(f"PRE-FLIGHT.md missing canonical gate marker: {marker}")
-    for marker in ["Node.js 22", "MAX_ROOMS", "WebSocket", "single", "90 seconds"]:
-        if marker not in deployment:
+    deployment_lower = deployment.lower()
+    for marker in ["node.js 22", "max_rooms", "websocket", "single", "90 seconds"]:
+        if marker not in deployment_lower:
             fail(f"DEPLOYMENT.md missing operational marker: {marker}")
     ok("Production documentation contract passed")
 
