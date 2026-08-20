@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           rm -rf dist
           mkdir -p dist/frostbridge
-          cp package.json package-lock.json README.md PRE-FLIGHT.md dist/frostbridge/
+          cp package.json package-lock.json README.md PRE-FLIGHT.md DEPLOYMENT.md dist/frostbridge/
           cp -R server public assets dist/frostbridge/
           tar -czf "frostbridge-multiplayer-${GITHUB_SHA::7}.tar.gz" -C dist frostbridge
 
