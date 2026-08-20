@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 import socket
 import subprocess
 import time
@@ -15,8 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FILES = [
     "package.json",
     "package-lock.json",
+    ".gitignore",
     "README.md",
     "PRE-FLIGHT.md",
+    "DEPLOYMENT.md",
     "server/app.js",
     "server/config.js",
     "server/protocol.js",
@@ -172,6 +173,22 @@ def validate_package_contract() -> None:
     ok("Node/runtime dependency contract passed")
 
 
+def validate_documentation_contract() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    preflight = (ROOT / "PRE-FLIGHT.md").read_text(encoding="utf-8")
+    deployment = (ROOT / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    for marker in ["/host/", "/tv/?room=ABCDE", "/play/?room=ABCDE", "assets/mockups/tv-gameplay.svg"]:
+        if marker not in readme:
+            fail(f"README missing production documentation marker: {marker}")
+    for marker in ["npm ci", "npm test", "python scripts/preflight.py", "frostbridge-multiplayer-"]:
+        if marker not in preflight:
+            fail(f"PRE-FLIGHT.md missing canonical gate marker: {marker}")
+    for marker in ["Node.js 22", "MAX_ROOMS", "WebSocket", "single", "90 seconds"]:
+        if marker not in deployment:
+            fail(f"DEPLOYMENT.md missing operational marker: {marker}")
+    ok("Production documentation contract passed")
+
+
 def free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -236,14 +253,6 @@ def smoke_node_server() -> None:
             server.kill()
 
 
-def validate_readme() -> None:
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    for marker in ["/host/", "/tv/?room=ABCDE", "/play/?room=ABCDE", "assets/mockups/tv-gameplay.svg"]:
-        if marker not in readme:
-            fail(f"README missing production documentation marker: {marker}")
-    ok("README multiplayer documentation passed")
-
-
 def main() -> None:
     print("=== RUSHLINE REBELS: FROSTBRIDGE MULTIPLAYER PRE-FLIGHT ===")
     validate_required_files()
@@ -253,7 +262,7 @@ def main() -> None:
     validate_private_dependency_boundary()
     validate_javascript_syntax()
     validate_package_contract()
-    validate_readme()
+    validate_documentation_contract()
     smoke_node_server()
     print("=== MULTIPLAYER PRE-FLIGHT PASS ===")
 
