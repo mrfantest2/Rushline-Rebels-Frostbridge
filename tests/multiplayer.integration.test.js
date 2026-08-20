@@ -16,11 +16,14 @@ async function join(socket, roomCode, displayName, characterId) {
 async function ready(socket, roomCode, playerToken) {
   const result = await emitAck(socket, EVENTS.PLAYER_SET_READY, p({ roomCode, playerToken, ready: true }));
   assert.equal(result.ok, true);
-  return result;
+}
+
+async function move(socket, roomCode, playerToken, roundId, stageIndex, inputSeq, side) {
+  return emitAck(socket, EVENTS.PLAYER_MOVE, p({ roomCode, playerToken, roundId, stageIndex, inputSeq, side }));
 }
 
 test('real multiplayer room preserves secrecy, idempotency, reconnect, late-join rules, and round reuse', async (t) => {
-  const app = createApp({ configOverrides: { countdownMs: 10, revealMs: 10, decisionMs: 200, stageCount: 2, startingLives: 3 } });
+  const app = createApp({ configOverrides: { countdownMs: 10, revealMs: 10, decisionMs: 1200, stageCount: 2, startingLives: 3 } });
   const port = await app.start(0);
   t.after(async () => app.stop());
 
@@ -35,9 +38,7 @@ test('real multiplayer room preserves secrecy, idempotency, reconnect, late-join
   const room = await emitAck(host, EVENTS.HOST_CREATE_ROOM, p());
   assert.equal(room.ok, true);
   assert.match(room.roomCode, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/);
-
-  const tvWatch = await emitAck(tv, EVENTS.TV_WATCH, p({ roomCode: room.roomCode }));
-  assert.equal(tvWatch.ok, true);
+  assert.equal((await emitAck(tv, EVENTS.TV_WATCH, p({ roomCode: room.roomCode }))).ok, true);
 
   const a = await join(p1, room.roomCode, 'Nadir', 'nadir');
   const b = await join(p2, room.roomCode, 'Dana', 'dana');
@@ -53,66 +54,33 @@ test('real multiplayer room preserves secrecy, idempotency, reconnect, late-join
     });
   }
 
-  const stageOpen = onceEvent(tv, EVENTS.STAGE_OPEN);
+  const firstStagePromise = onceEvent(tv, EVENTS.STAGE_OPEN);
   const start = await emitAck(host, EVENTS.HOST_START_ROUND, p({ roomCode: room.roomCode, hostToken: room.hostToken }));
   assert.equal(start.ok, true);
-  const stage = await stageOpen;
-  assert.equal(stage.stageIndex, 0);
-  assert.equal(JSON.stringify(stage).includes('safeSide'), false);
+  const firstStage = await firstStagePromise;
+  assert.equal(firstStage.stageIndex, 0);
+  assert.equal(JSON.stringify(firstStage).includes('safeSide'), false);
 
-  const firstMove = await emitAck(p1, EVENTS.PLAYER_MOVE, p({
-    roomCode: room.roomCode,
-    playerToken: a.playerToken,
-    roundId: stage.roundId,
-    stageIndex: stage.stageIndex,
-    inputSeq: 10,
-    side: 'L',
-  }));
-  assert.equal(firstMove.ok, true);
+  assert.equal((await move(p1, room.roomCode, a.playerToken, firstStage.roundId, 0, 10, 'L')).ok, true);
+  assert.equal((await move(p1, room.roomCode, a.playerToken, firstStage.roundId, 0, 10, 'R')).code, ERROR_CODES.INPUT_REPLAYED);
+  assert.equal((await move(p1, room.roomCode, a.playerToken, firstStage.roundId, 0, 11, 'R')).code, ERROR_CODES.MOVE_ALREADY_SUBMITTED);
+  assert.equal((await move(p3, room.roomCode, c.playerToken, firstStage.roundId, 1, 20, 'L')).code, ERROR_CODES.STAGE_STALE);
 
-  const replay = await emitAck(p1, EVENTS.PLAYER_MOVE, p({
-    roomCode: room.roomCode,
-    playerToken: a.playerToken,
-    roundId: stage.roundId,
-    stageIndex: stage.stageIndex,
-    inputSeq: 10,
-    side: 'R',
-  }));
-  assert.equal(replay.code, ERROR_CODES.INPUT_REPLAYED);
-
-  const duplicate = await emitAck(p1, EVENTS.PLAYER_MOVE, p({
-    roomCode: room.roomCode,
-    playerToken: a.playerToken,
-    roundId: stage.roundId,
-    stageIndex: stage.stageIndex,
-    inputSeq: 11,
-    side: 'R',
-  }));
-  assert.equal(duplicate.code, ERROR_CODES.MOVE_ALREADY_SUBMITTED);
-
-  const stale = await emitAck(p3, EVENTS.PLAYER_MOVE, p({
-    roomCode: room.roomCode,
-    playerToken: c.playerToken,
-    roundId: stage.roundId,
-    stageIndex: stage.stageIndex + 1,
-    inputSeq: 20,
-    side: 'L',
-  }));
-  assert.equal(stale.code, ERROR_CODES.STAGE_STALE);
-
-  const revealOnTv = onceEvent(tv, EVENTS.STAGE_REVEAL);
-  const revealOnHost = onceEvent(host, EVENTS.STAGE_REVEAL);
-  assert.equal((await emitAck(p2, EVENTS.PLAYER_MOVE, p({ roomCode: room.roomCode, playerToken: b.playerToken, roundId: stage.roundId, stageIndex: 0, inputSeq: 30, side: 'R' }))).ok, true);
-  assert.equal((await emitAck(p3, EVENTS.PLAYER_MOVE, p({ roomCode: room.roomCode, playerToken: c.playerToken, roundId: stage.roundId, stageIndex: 0, inputSeq: 21, side: 'L' }))).ok, true);
-
-  const [tvReveal, hostReveal] = await Promise.all([revealOnTv, revealOnHost]);
+  const tvRevealPromise = onceEvent(tv, EVENTS.STAGE_REVEAL);
+  const hostRevealPromise = onceEvent(host, EVENTS.STAGE_REVEAL);
+  assert.equal((await move(p2, room.roomCode, b.playerToken, firstStage.roundId, 0, 30, 'R')).ok, true);
+  assert.equal((await move(p3, room.roomCode, c.playerToken, firstStage.roundId, 0, 21, 'L')).ok, true);
+  const [tvReveal, hostReveal] = await Promise.all([tvRevealPromise, hostRevealPromise]);
   assert.deepEqual(hostReveal, tvReveal);
   assert.ok(['L', 'R'].includes(tvReveal.safeSide));
-  assert.equal(JSON.stringify(preRevealPublic).includes('safeSide'), false);
-  assert.equal(JSON.stringify(preRevealPublic).includes('"side":"L"'), false);
-  assert.equal(JSON.stringify(preRevealPublic).includes('"side":"R"'), false);
+  const publicBeforeReveal = JSON.stringify(preRevealPublic);
+  assert.equal(publicBeforeReveal.includes('safeSide'), false);
+  assert.equal(publicBeforeReveal.includes('"side":"L"'), false);
+  assert.equal(publicBeforeReveal.includes('"side":"R"'), false);
 
-  // Restore Dana onto a fresh transport and prove the same player identity/state returns.
+  // Subscribe before doing reconnect work: the server intentionally advances stages quickly.
+  const secondStagePromise = onceEvent(tv, EVENTS.STAGE_OPEN, 3000);
+
   p2.close();
   await wait(15);
   const p2Restored = await connectTestClient(port);
@@ -121,38 +89,27 @@ test('real multiplayer room preserves secrecy, idempotency, reconnect, late-join
   assert.equal(restored.ok, true);
   assert.equal(restored.playerId, b.playerId);
   assert.equal(restored.privateState.characterId, 'dana');
-  assert.equal(restored.privateState.playerId, b.playerId);
 
-  // Join during active play: the new player is a spectator until the next lobby.
   const lateSocket = await connectTestClient(port);
   sockets.push(lateSocket);
   const late = await join(lateSocket, room.roomCode, 'Late Rebel', 'zayd');
   assert.equal(late.privateState.roundEligible, false);
 
-  const secondStage = await onceEvent(tv, EVENTS.STAGE_OPEN);
+  const secondStage = await secondStagePromise;
   assert.equal(secondStage.stageIndex, 1);
-  const lateMove = await emitAck(lateSocket, EVENTS.PLAYER_MOVE, p({
-    roomCode: room.roomCode,
-    playerToken: late.playerToken,
-    roundId: secondStage.roundId,
-    stageIndex: secondStage.stageIndex,
-    inputSeq: 1,
-    side: 'L',
-  }));
-  assert.equal(lateMove.code, ERROR_CODES.PLAYER_AUTH_FAILED);
+  assert.equal((await move(lateSocket, room.roomCode, late.playerToken, secondStage.roundId, 1, 1, 'L')).code, ERROR_CODES.PLAYER_AUTH_FAILED);
 
-  const finished = onceEvent(tv, EVENTS.ROUND_FINISHED, 3000);
-  const stage2Reveal = onceEvent(tv, EVENTS.STAGE_REVEAL, 3000);
-  assert.equal((await emitAck(p1, EVENTS.PLAYER_MOVE, p({ roomCode: room.roomCode, playerToken: a.playerToken, roundId: secondStage.roundId, stageIndex: 1, inputSeq: 12, side: 'L' }))).ok, true);
-  assert.equal((await emitAck(p2Restored, EVENTS.PLAYER_MOVE, p({ roomCode: room.roomCode, playerToken: b.playerToken, roundId: secondStage.roundId, stageIndex: 1, inputSeq: 31, side: 'R' }))).ok, true);
-  assert.equal((await emitAck(p3, EVENTS.PLAYER_MOVE, p({ roomCode: room.roomCode, playerToken: c.playerToken, roundId: secondStage.roundId, stageIndex: 1, inputSeq: 22, side: 'L' }))).ok, true);
-  await stage2Reveal;
-  const final = await finished;
+  const finalRevealPromise = onceEvent(tv, EVENTS.STAGE_REVEAL, 3000);
+  const finishedPromise = onceEvent(tv, EVENTS.ROUND_FINISHED, 3000);
+  assert.equal((await move(p1, room.roomCode, a.playerToken, secondStage.roundId, 1, 12, 'L')).ok, true);
+  assert.equal((await move(p2Restored, room.roomCode, b.playerToken, secondStage.roundId, 1, 31, 'R')).ok, true);
+  assert.equal((await move(p3, room.roomCode, c.playerToken, secondStage.roundId, 1, 22, 'L')).ok, true);
+  await finalRevealPromise;
+  const final = await finishedPromise;
   assert.equal(final.ranking.length, 3);
-  assert.deepEqual([...final.ranking].map((r) => r.place), [1, 2, 3]);
-  assert.equal(new Set(final.ranking.map((r) => r.playerId)).size, 3);
+  assert.deepEqual(final.ranking.map((entry) => entry.place), [1, 2, 3]);
+  assert.equal(new Set(final.ranking.map((entry) => entry.playerId)).size, 3);
 
-  // Gateway returns the room to lobby after the final reveal/finish transition.
   await wait(25);
   const lobby = app.roomManager.roomSnapshot(room.roomCode);
   assert.equal(lobby.status, 'lobby');
@@ -160,13 +117,13 @@ test('real multiplayer room preserves secrecy, idempotency, reconnect, late-join
   assert.equal(lobby.players.every((player) => player.ready === false), true);
   assert.equal(lobby.players.find((player) => player.playerId === late.playerId).roundEligible, true);
 
-  // Same room can run again without creating new credentials.
-  const secondRoundStage = onceEvent(host, EVENTS.STAGE_OPEN, 3000);
+  const restartedStagePromise = onceEvent(host, EVENTS.STAGE_OPEN, 3000);
   const restart = await emitAck(host, EVENTS.HOST_START_ROUND, p({ roomCode: room.roomCode, hostToken: room.hostToken }));
   assert.equal(restart.ok, true);
-  const reopened = await secondRoundStage;
-  assert.equal(reopened.stageIndex, 0);
-  assert.notEqual(reopened.roundId, stage.roundId);
+  const restartedStage = await restartedStagePromise;
+  assert.equal(restartedStage.stageIndex, 0);
+  assert.notEqual(restartedStage.roundId, firstStage.roundId);
 
-  await emitAck(host, EVENTS.HOST_END_ROUND, p({ roomCode: room.roomCode, hostToken: room.hostToken, reason: 'integration-complete' }));
+  const ended = await emitAck(host, EVENTS.HOST_END_ROUND, p({ roomCode: room.roomCode, hostToken: room.hostToken, reason: 'integration-complete' }));
+  assert.equal(ended.ok, true);
 });
