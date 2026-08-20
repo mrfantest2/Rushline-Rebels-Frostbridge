@@ -1,0 +1,7 @@
+{
+  "state": "waiting",
+  "stage": "codespace_refresh_required",
+  "detail": "Pull the latest feature/cloud-vertical-slice branch in the active Rushline Codespace, then run tools/codespace-build.sh.",
+  "source_sha": "6b0f98d97611432a84444dc33f55197ee72b9a65",
+  "updated_at": "2026-08-20T23:47:00Z"
+}
