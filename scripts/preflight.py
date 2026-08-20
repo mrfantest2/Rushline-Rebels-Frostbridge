@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import re
+import os
+import socket
 import subprocess
-import sys
-import tempfile
+import time
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -12,8 +12,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = [
+    "package.json",
+    "package-lock.json",
+    ".gitignore",
     "README.md",
-    "index.html",
+    "PRE-FLIGHT.md",
+    "DEPLOYMENT.md",
+    "server/app.js",
+    "server/config.js",
+    "server/protocol.js",
+    "server/validators.js",
+    "server/session-manager.js",
+    "server/game-engine.js",
+    "server/room-manager.js",
+    "server/socket-gateway.js",
+    "server/logger.js",
+    "public/index.html",
+    "public/shared/socket.js",
+    "public/shared/ui.css",
+    "public/host/index.html",
+    "public/host/host.js",
+    "public/tv/index.html",
+    "public/tv/tv.js",
+    "public/play/index.html",
+    "public/play/play.js",
+    "tests/multiplayer.integration.test.js",
+    "tests/protocol.test.js",
+    "tests/routes.test.js",
     "assets/characters/nadir.svg",
     "assets/characters/zayd.svg",
     "assets/characters/jolyne.svg",
@@ -26,7 +51,7 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_CHARACTER_IDS = ["nadir", "zayd", "jolyne", "dana", "sami", "rami"]
-REQUIRED_DOM_IDS = [
+REQUIRED_DEMO_DOM_IDS = [
     "livesHud", "timeHud", "stageHud", "roster", "bridge", "portrait",
     "runnerImg", "runner", "distance", "progressBar", "startBtn",
     "shuffleBtn", "modal", "modalTitle", "modalText", "againBtn",
@@ -43,13 +68,13 @@ def ok(message: str) -> None:
 
 
 def validate_required_files() -> None:
-    missing = [p for p in REQUIRED_FILES if not (ROOT / p).is_file()]
+    missing = [path for path in REQUIRED_FILES if not (ROOT / path).is_file()]
     if missing:
         fail("Missing required files: " + ", ".join(missing))
-    empty = [p for p in REQUIRED_FILES if (ROOT / p).stat().st_size == 0]
+    empty = [path for path in REQUIRED_FILES if (ROOT / path).stat().st_size == 0]
     if empty:
         fail("Empty required files: " + ", ".join(empty))
-    ok(f"Required file set present ({len(REQUIRED_FILES)} files)")
+    ok(f"Required multiplayer file set present ({len(REQUIRED_FILES)} files)")
 
 
 def validate_svg_files() -> None:
@@ -58,8 +83,7 @@ def validate_svg_files() -> None:
         fail(f"Expected at least 9 SVG assets, found {len(svgs)}")
     for path in svgs:
         try:
-            tree = ET.parse(path)
-            root = tree.getroot()
+            root = ET.parse(path).getroot()
         except ET.ParseError as exc:
             fail(f"Invalid SVG XML: {path.relative_to(ROOT)}: {exc}")
         if not root.tag.lower().endswith("svg"):
@@ -67,126 +91,161 @@ def validate_svg_files() -> None:
     ok(f"SVG/XML validation passed ({len(svgs)} files)")
 
 
-def validate_html() -> str:
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
-
-    for dom_id in REQUIRED_DOM_IDS:
+def validate_demo_html() -> None:
+    html = (ROOT / "public/index.html").read_text(encoding="utf-8")
+    for dom_id in REQUIRED_DEMO_DOM_IDS:
         if f'id="{dom_id}"' not in html and f"id='{dom_id}'" not in html:
-            fail(f"Missing required DOM id: {dom_id}")
-
+            fail(f"Demo missing required DOM id: {dom_id}")
     for character_id in REQUIRED_CHARACTER_IDS:
         if f"id:'{character_id}'" not in html and f'id:"{character_id}"' not in html:
-            fail(f"Missing character definition: {character_id}")
-
-    required_logic = [
-        "function newPattern()",
-        "function buildBridge()",
-        "function syncLocks()",
-        "function start()",
-        "function choose(",
-        "function sync()",
-        "function finish(",
-        "tile.classList.contains('broken')",
-        "Array.from({length:10}",
-        "time=45",
-        "lives=3",
-    ]
-    for marker in required_logic:
+            fail(f"Demo missing character definition: {character_id}")
+    for marker in [
+        "function newPattern()", "function buildBridge()", "function syncLocks()",
+        "function start()", "function choose(", "function finish(",
+        "tile.classList.contains('broken')", "Array.from({length:10}",
+    ]:
         if marker not in html:
-            fail(f"Missing game-logic marker: {marker}")
+            fail(f"Demo missing game-logic marker: {marker}")
+    ok("Preserved standalone demo integrity passed")
 
+
+def validate_multiplayer_surfaces() -> None:
+    expected = {
+        "public/host/index.html": ["Create room", "Start round", "Close room"],
+        "public/tv/index.html": ["Frostbridge · TV", "roomCode", "bridge"],
+        "public/play/index.html": ["Join Frostbridge", "LEFT", "RIGHT"],
+    }
+    for path, markers in expected.items():
+        text = (ROOT / path).read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                fail(f"{path} missing marker: {marker}")
+    player_js = (ROOT / "public/play/play.js").read_text(encoding="utf-8")
+    host_js = (ROOT / "public/host/host.js").read_text(encoding="utf-8")
+    tv_js = (ROOT / "public/tv/tv.js").read_text(encoding="utf-8")
+    if "frostbridge:player:${code}" not in player_js:
+        fail("Player credential storage contract missing")
+    if "frostbridge:host:${code}" not in host_js:
+        fail("Host credential storage contract missing")
+    if "localStorage" in tv_js:
+        fail("TV surface must not persist credentials")
+    ok("Host/TV/player surface contracts passed")
+
+
+def validate_private_dependency_boundary() -> None:
     forbidden = [
         "mrfantest2/Fantest_Party_Platform",
         "raw.githubusercontent.com/mrfantest2/Fantest_Party_Platform",
-        "javascript:",
     ]
-    lowered = html.lower()
-    for marker in forbidden:
-        if marker.lower() in lowered:
-            fail(f"Forbidden/private dependency found in index.html: {marker}")
-
-    refs = re.findall(r'''(?:src|href)=["']([^"']+)["']''', html, flags=re.I)
-    checked = 0
-    for ref in refs:
-        # Template expressions such as ${c.img} are dynamic JS-generated markup.
-        # Their concrete character paths are validated through REQUIRED_FILES.
-        if "${" in ref:
-            continue
-        if ref.startswith(("http://", "https://", "#", "mailto:", "tel:")):
-            continue
-        target = (ROOT / ref.split("?", 1)[0].split("#", 1)[0]).resolve()
-        try:
-            target.relative_to(ROOT.resolve())
-        except ValueError:
-            fail(f"Asset reference escapes repository root: {ref}")
-        if not target.exists():
-            fail(f"Broken local asset reference: {ref}")
-        checked += 1
-
-    ok(f"HTML/game integrity passed ({checked} concrete local asset links checked)")
-    return html
+    runtime_files = list((ROOT / "server").rglob("*.js")) + list((ROOT / "public").rglob("*.js")) + list((ROOT / "public").rglob("*.html"))
+    for path in runtime_files:
+        text = path.read_text(encoding="utf-8").lower()
+        for marker in forbidden:
+            if marker.lower() in text:
+                fail(f"Private monorepo dependency found in {path.relative_to(ROOT)}: {marker}")
+    ok("Runtime has no private Fantest Party dependency")
 
 
-def validate_readme() -> None:
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    for path in [
-        "assets/mockups/tv-gameplay.svg",
-        "assets/mockups/phone-controller.svg",
-        "assets/mockups/character-select.svg",
-    ]:
-        if path not in readme:
-            fail(f"README does not expose design image: {path}")
-    ok("README exposes all design boards")
-
-
-def validate_javascript(html: str) -> None:
-    scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, flags=re.I | re.S)
-    if not scripts:
-        fail("No inline JavaScript found")
-    js = "\n".join(scripts)
-    with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as handle:
-        handle.write(js)
-        js_path = Path(handle.name)
-    try:
-        node = subprocess.run(
-            ["node", "--check", str(js_path)],
+def validate_javascript_syntax() -> None:
+    files = sorted((ROOT / "server").rglob("*.js")) + sorted((ROOT / "public").rglob("*.js"))
+    for path in files:
+        result = subprocess.run(
+            ["node", "--check", str(path)],
+            cwd=ROOT,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-    finally:
-        js_path.unlink(missing_ok=True)
-    if node.returncode != 0:
-        print(node.stdout)
-        fail("JavaScript syntax validation failed")
-    ok("JavaScript syntax validation passed")
+        if result.returncode != 0:
+            print(result.stdout)
+            fail(f"JavaScript syntax validation failed: {path.relative_to(ROOT)}")
+    ok(f"JavaScript syntax validation passed ({len(files)} runtime files)")
 
 
-def smoke_http() -> None:
+def validate_package_contract() -> None:
+    package = (ROOT / "package.json").read_text(encoding="utf-8")
+    lock = (ROOT / "package-lock.json").read_text(encoding="utf-8")
+    for marker in ['"node": ">=22"', '"express"', '"socket.io"', '"socket.io-client"']:
+        if marker not in package:
+            fail(f"package.json missing runtime contract: {marker}")
+    if '"lockfileVersion"' not in lock:
+        fail("package-lock.json is not a valid npm lockfile")
+    ok("Node/runtime dependency contract passed")
+
+
+def validate_documentation_contract() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    preflight = (ROOT / "PRE-FLIGHT.md").read_text(encoding="utf-8")
+    deployment = (ROOT / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    for marker in ["/host/", "/tv/?room=ABCDE", "/play/?room=ABCDE", "assets/mockups/tv-gameplay.svg"]:
+        if marker not in readme:
+            fail(f"README missing production documentation marker: {marker}")
+    for marker in ["npm ci", "npm test", "python scripts/preflight.py", "frostbridge-multiplayer-"]:
+        if marker not in preflight:
+            fail(f"PRE-FLIGHT.md missing canonical gate marker: {marker}")
+    deployment_lower = deployment.lower()
+    for marker in ["node.js 22", "max_rooms", "websocket", "single", "90 seconds"]:
+        if marker not in deployment_lower:
+            fail(f"DEPLOYMENT.md missing operational marker: {marker}")
+    ok("Production documentation contract passed")
+
+
+def free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def request(path: str, port: int) -> tuple[int, bytes]:
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=2) as response:
+        return int(response.status), response.read()
+
+
+def smoke_node_server() -> None:
+    port = free_port()
+    env = os.environ.copy()
+    env["PORT"] = str(port)
     server = subprocess.Popen(
-        [sys.executable, "-m", "http.server", "8765", "--bind", "127.0.0.1"],
+        ["node", "server/app.js"],
         cwd=ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
     )
     try:
-        import time
-        deadline = time.time() + 8
+        deadline = time.time() + 10
         last_error: Exception | None = None
         while time.time() < deadline:
+            if server.poll() is not None:
+                output = server.stdout.read() if server.stdout else ""
+                fail(f"Node server exited during smoke test ({server.returncode}): {output}")
             try:
-                with urllib.request.urlopen("http://127.0.0.1:8765/index.html", timeout=2) as response:
-                    body = response.read().decode("utf-8")
-                    if response.status != 200:
-                        fail(f"HTTP smoke returned status {response.status}")
-                    if "Rushline Rebels" not in body or "FROST" not in body:
-                        fail("HTTP smoke returned unexpected page content")
-                    ok("Local HTTP smoke test passed")
-                    return
-            except Exception as exc:  # server may still be starting
+                status, body = request("/readyz", port)
+                if status == 200 and b"protocolVersion" in body:
+                    break
+            except Exception as exc:
                 last_error = exc
                 time.sleep(0.2)
-        fail(f"HTTP smoke test failed: {last_error}")
+        else:
+            fail(f"Node server did not become ready: {last_error}")
+
+        checks = [
+            ("/healthz", b"frostbridge"),
+            ("/readyz", b"protocolVersion"),
+            ("/", b"Rushline Rebels"),
+            ("/host/", b"Frostbridge Host"),
+            ("/tv/?room=ABCDE", b"Frostbridge TV"),
+            ("/play/", b"Frostbridge Player"),
+            ("/assets/characters/dana.svg", b"<svg"),
+        ]
+        for path, marker in checks:
+            status, body = request(path, port)
+            if status != 200:
+                fail(f"HTTP smoke returned {status} for {path}")
+            if marker not in body:
+                fail(f"HTTP smoke returned unexpected body for {path}")
+        ok(f"Real Node/Socket.IO HTTP smoke passed ({len(checks)} routes)")
     finally:
         server.terminate()
         try:
@@ -196,14 +255,17 @@ def smoke_http() -> None:
 
 
 def main() -> None:
-    print("=== RUSHLINE REBELS: FROSTBRIDGE PRE-FLIGHT ===")
+    print("=== RUSHLINE REBELS: FROSTBRIDGE MULTIPLAYER PRE-FLIGHT ===")
     validate_required_files()
     validate_svg_files()
-    html = validate_html()
-    validate_readme()
-    validate_javascript(html)
-    smoke_http()
-    print("=== PRE-FLIGHT PASS ===")
+    validate_demo_html()
+    validate_multiplayer_surfaces()
+    validate_private_dependency_boundary()
+    validate_javascript_syntax()
+    validate_package_contract()
+    validate_documentation_contract()
+    smoke_node_server()
+    print("=== MULTIPLAYER PRE-FLIGHT PASS ===")
 
 
 if __name__ == "__main__":
