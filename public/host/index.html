@@ -1,1 +1,76 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Frostbridge Host</title><link rel="stylesheet" href="/shared/ui.css"></head><body><main class="shell"><div class="top"><div class="brand"><div class="mark">RR</div><div><div class="eyebrow">Rushline Rebels</div><b>Frostbridge Host</b></div></div><a class="button secondary" href="/">Game home</a></div><div class="grid"><section class="card span7"><div class="eyebrow">Room control</div><h1 id="roomCode" class="code">-----</h1><p id="hostStatus" class="muted">Create a room to begin.</p><div class="row"><button id="createBtn" class="primary">Create room</button><button id="copyBtn" class="secondary" disabled>Copy player link</button><button id="startBtn" class="primary" disabled>Start round</button><button id="endBtn" class="secondary" disabled>End round</button><button id="closeBtn" class="danger" disabled>Close room</button></div></section><section class="card span5"><div class="eyebrow">Live stage</div><div id="stageTitle" class="status">Lobby</div><div class="row" style="margin-top:12px"><span class="pill">Stage <b id="stageIndex">0/10</b></span><span class="pill">Submitted <b id="submittedCount">0/0</b></span><span class="pill">Time <b id="stageTimer">--</b></span></div></section><section class="card span7"><div class="eyebrow">Players</div><h2>Connected Rebels</h2><div id="roster" class="roster"><p class="muted">No players yet.</p></div></section><section class="card span5"><div class="eyebrow">Round settings</div><div class="stack"><div class="field"><label>Stages</label><input id="stageCount" type="number" min="1" max="30" value="10"></div><div class="field"><label>Starting lives</label><input id="startingLives" type="number" min="1" max="9" value="3"></div><div class="field"><label>Decision window (ms)</label><input id="decisionMs" type="number" min="2000" max="30000" value="8000"></div><div class="field"><label>Reveal (ms)</label><input id="revealMs" type="number" min="250" max="10000" value="1800"></div><div class="field"><label>Countdown (ms)</label><input id="countdownMs" type="number" min="0" max="10000" value="3000"></div><button id="settingsBtn" class="secondary" disabled>Save settings</button></div></section><section class="card"><div class="eyebrow">Last result</div><div id="ranking" class="ranking"><p class="muted">No completed round.</p></div></section></div></main><script src="/socket.io/socket.io.js"></script><script type="module" src="/host/host.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Frostbridge Host</title>
+  <link rel="stylesheet" href="/shared/ui.css">
+</head>
+<body>
+  <main class="shell">
+    <div class="screen-frame host-screen">
+      <header class="top">
+        <div class="brand"><div class="mark">RR</div><div><div class="eyebrow">Rushline Rebels</div><b>Frostbridge · Control Room</b></div></div>
+        <a class="button secondary" href="/">Game home</a>
+      </header>
+
+      <section class="host-hero">
+        <div class="room-code-panel">
+          <div class="eyebrow">Live room code</div>
+          <h1 id="roomCode" class="code">-----</h1>
+          <p id="hostStatus" class="muted">Create a room to begin.</p>
+          <div class="host-actions">
+            <button id="createBtn" class="primary">Create room</button>
+            <button id="copyBtn" class="secondary" disabled>Copy player link</button>
+            <button id="startBtn" class="primary" disabled>Start round</button>
+            <button id="endBtn" class="secondary" disabled>End round</button>
+            <button id="closeBtn" class="danger" disabled>Close room</button>
+          </div>
+        </div>
+
+        <div class="host-status-strip">
+          <div class="metric"><span>Phase</span><strong id="stageTitle">Lobby</strong></div>
+          <div class="metric"><span>Stage</span><strong id="stageIndex">0/10</strong></div>
+          <div class="metric"><span>Locked</span><strong id="submittedCount">0/0</strong></div>
+          <div class="metric"><span>Clock</span><strong id="stageTimer">--</strong></div>
+          <div class="metric"><span>Server</span><strong><i class="status-orb"></i> Live</strong></div>
+          <div class="metric"><span>Authority</span><strong>Host</strong></div>
+        </div>
+      </section>
+
+      <div class="host-dashboard">
+        <div class="host-column">
+          <section class="host-section glass-panel">
+            <div class="eyebrow">Players</div>
+            <h2>Connected Rebels</h2>
+            <div id="roster" class="roster"><p class="muted">No players yet.</p></div>
+          </section>
+          <section class="host-section glass-panel">
+            <div class="eyebrow">Last result</div>
+            <h2>Round ranking</h2>
+            <div id="ranking" class="ranking"><p class="muted">No completed round.</p></div>
+          </section>
+        </div>
+
+        <div class="host-column">
+          <section class="host-section glass-panel">
+            <div class="eyebrow">Round settings</div>
+            <h2>Frostbridge rules</h2>
+            <div class="settings-grid">
+              <div class="field"><label>Stages</label><input id="stageCount" type="number" min="1" max="30" value="10"></div>
+              <div class="field"><label>Starting lives</label><input id="startingLives" type="number" min="1" max="9" value="3"></div>
+              <div class="field"><label>Decision window (ms)</label><input id="decisionMs" type="number" min="2000" max="30000" value="8000"></div>
+              <div class="field"><label>Reveal (ms)</label><input id="revealMs" type="number" min="250" max="10000" value="1800"></div>
+              <div class="field"><label>Countdown (ms)</label><input id="countdownMs" type="number" min="0" max="10000" value="3000"></div>
+            </div>
+            <div class="row" style="margin-top:12px"><button id="settingsBtn" class="secondary" disabled>Save settings</button></div>
+          </section>
+          <div class="host-note">Players choose privately. The safe panel is revealed only after the decision window resolves, so the host display never gives away an unrevealed answer.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/host/host.js"></script>
+</body>
+</html>
