@@ -1,0 +1,32 @@
+import { emitAck, socket, setText } from '../shared/socket.js';
+
+const E={CREATE:'host:create-room',RESTORE:'host:restore',SETTINGS:'host:update-settings',START:'host:start-round',END:'host:end-round',CLOSE:'host:close-room',SNAP:'room:snapshot',COUNTDOWN:'round:countdown',OPEN:'stage:open',COUNT:'stage:submission-count',REVEAL:'stage:reveal',FINISH:'round:finished',CLOSED:'room:closed'};
+let roomCode='',hostToken='',snapshot=null,deadlineAt=null;
+const $=id=>document.getElementById(id);
+const tokenKey=code=>`frostbridge:host:${code}`;
+
+function setAuth(code,token){roomCode=code;hostToken=token;localStorage.setItem('frostbridge:last-host-room',code);localStorage.setItem(tokenKey(code),token);setText('roomCode',code);}
+function renderRoster(players=[]){$('roster').innerHTML=players.length?players.map(p=>`<div class="player"><img src="/assets/characters/${p.characterId}.svg" alt=""><div><b>${escapeHtml(p.displayName)}</b><small>${p.characterId} · ${p.connected?'connected':'offline'} · ${p.ready?'ready':'not ready'}</small></div><span class="pill ${p.eliminated?'bad':p.connected?'ok':''}">${p.lives==null?'LOBBY':p.eliminated?'OUT':`${p.lives} ♥`}</span></div>`).join(''):'<p class="muted">No players yet.</p>'}
+function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+function renderRanking(ranking=[]){$('ranking').innerHTML=ranking.length?ranking.map(r=>`<div class="rank"><b>#${r.place} ${escapeHtml(snapshot?.players.find(p=>p.playerId===r.playerId)?.displayName||r.playerId)}</b><span>${r.furthestStage} stages · ${r.lives} ♥</span></div>`).join(''):'<p class="muted">No completed round.</p>'}
+function applySnapshot(next){snapshot=next;roomCode=next.roomCode||roomCode;setText('roomCode',roomCode||'-----');setText('hostStatus',`${next.status.toUpperCase()} · ${next.players.length}/${next.settings.maxPlayers} players`);renderRoster(next.players);if(next.status==='lobby'){for(const id of ['stageCount','startingLives','decisionMs','revealMs','countdownMs'])if(document.activeElement!==$(id))$(id).value=next.settings[id];}const round=next.round;setText('stageIndex',round&&round.stageIndex>=0?`${round.stageIndex+1}/${next.settings.stageCount}`:`0/${next.settings.stageCount}`);deadlineAt=round?.deadlineAt||null;const auth=Boolean(hostToken);$('copyBtn').disabled=!auth;$('closeBtn').disabled=!auth;$('settingsBtn').disabled=!auth||next.status!=='lobby';$('startBtn').disabled=!auth||next.status!=='lobby'||next.players.length===0;$('endBtn').disabled=!auth||['lobby','finished','closed'].includes(next.status);if(next.status==='lobby')setText('stageTitle','Lobby · waiting for host');else if(next.status==='countdown')setText('stageTitle','Round countdown');else if(next.status==='stage-open')setText('stageTitle','Choices open');else if(next.status==='stage-reveal')setText('stageTitle','Revealing ice');else if(next.status==='finished')setText('stageTitle','Round finished');if(round?.ranking)renderRanking(round.ranking);}
+function clearSession(){if(roomCode)localStorage.removeItem(tokenKey(roomCode));localStorage.removeItem('frostbridge:last-host-room');roomCode='';hostToken='';snapshot=null;deadlineAt=null;setText('roomCode','-----');setText('hostStatus','Room closed. Create a new room.');renderRoster([]);for(const id of ['copyBtn','startBtn','endBtn','closeBtn','settingsBtn'])$(id).disabled=true;}
+
+$('createBtn').onclick=async()=>{const r=await emitAck(E.CREATE);if(!r.ok)return setText('hostStatus',r.code);setAuth(r.roomCode,r.hostToken);applySnapshot(r.roomSnapshot);};
+$('copyBtn').onclick=async()=>{const url=`${location.origin}/play/?room=${roomCode}`;await navigator.clipboard?.writeText(url);setText('hostStatus',`Player link copied: ${url}`);};
+$('settingsBtn').onclick=async()=>{const settings=Object.fromEntries(['stageCount','startingLives','decisionMs','revealMs','countdownMs'].map(id=>[id,Number($(id).value)]));const r=await emitAck(E.SETTINGS,{roomCode,hostToken,settings});if(r.ok)applySnapshot(r.roomSnapshot);else setText('hostStatus',r.code);};
+$('startBtn').onclick=async()=>{const r=await emitAck(E.START,{roomCode,hostToken});if(!r.ok)setText('hostStatus',r.code);};
+$('endBtn').onclick=async()=>{const r=await emitAck(E.END,{roomCode,hostToken,reason:'host-ended'});if(!r.ok)setText('hostStatus',r.code);};
+$('closeBtn').onclick=async()=>{const r=await emitAck(E.CLOSE,{roomCode,hostToken});if(r.ok)clearSession();else setText('hostStatus',r.code);};
+
+socket.on(E.SNAP,applySnapshot);
+socket.on(E.COUNTDOWN,e=>{setText('stageTitle','Get ready…');setText('submittedCount','0/0');deadlineAt=e.startsAt;});
+socket.on(E.OPEN,e=>{setText('stageTitle','Choices open');setText('stageIndex',`${e.stageIndex+1}/${snapshot?.settings.stageCount||10}`);setText('submittedCount',`0/${e.aliveCount}`);deadlineAt=e.deadlineAt;});
+socket.on(E.COUNT,e=>setText('submittedCount',`${e.submittedCount}/${e.aliveCount}`));
+socket.on(E.REVEAL,e=>{setText('stageTitle',`Safe side: ${e.safeSide}`);deadlineAt=null;});
+socket.on(E.FINISH,e=>{setText('stageTitle','Round finished');renderRanking(e.ranking||[]);deadlineAt=null;});
+socket.on(E.CLOSED,e=>{if(e.roomCode===roomCode)clearSession();});
+
+setInterval(()=>{if(!deadlineAt)return setText('stageTimer','--');setText('stageTimer',`${Math.max(0,(deadlineAt-Date.now())/1000).toFixed(1)}s`);},100);
+
+(async function restore(){const code=new URLSearchParams(location.search).get('room')?.toUpperCase()||localStorage.getItem('frostbridge:last-host-room')||'';const token=code?localStorage.getItem(tokenKey(code)):'';if(!code||!token)return;const r=await emitAck(E.RESTORE,{roomCode:code,hostToken:token});if(r.ok){setAuth(code,token);applySnapshot(r.roomSnapshot);}else{localStorage.removeItem(tokenKey(code));localStorage.removeItem('frostbridge:last-host-room');}})();
