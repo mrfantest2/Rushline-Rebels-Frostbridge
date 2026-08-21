@@ -1,7 +1,7 @@
 {
-  "state": "running",
+  "state": "failed",
   "stage": "release_tests",
-  "detail": "Running Rushline headless tests",
+  "detail": "Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  ERROR: Parse JSON failed. Error at line 0: Expected key    at: parse_string (core/io/json.cpp:582) ERROR: Failed temp write must preserve primary    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: First result commit wrong    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Duplicate commit must not add coins    at: push_error (core/variant/variant_utility.cpp:1098) Rushline tests: FAIL (3) WARNING: ObjectDB instances leaked at exit (run with --verbose for details).      at: cleanup (core/object/object.cpp:2378) ERROR: 1 resources still in use at exit (run with --verbose for details).    at: clear (core/io/resource.cpp:614) ",
   "source_sha": "b4bcf9274edddf034c6a4a63a7fa9c9d24c93db2",
-  "updated_at": "2026-08-21T03:03:32Z"
+  "updated_at": "2026-08-21T03:03:34Z"
 }
