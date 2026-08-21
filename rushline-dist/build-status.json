@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release_verify_apk",
-  "detail": "Verifying APK signature",
+  "stage": "release_manifest",
+  "detail": "Generating v0.1.0 updater manifest",
   "source_sha": "80b6d7d09ecfed64098f7fa37c58a4c975205e8b",
-  "updated_at": "2026-08-21T00:44:26Z"
+  "updated_at": "2026-08-21T00:44:29Z"
 }
