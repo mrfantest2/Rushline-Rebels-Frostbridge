@@ -1,7 +1,7 @@
 {
-  "state": "waiting",
-  "stage": "codespace_refresh_required",
-  "detail": "Pull the latest feature/cloud-vertical-slice branch in the active Rushline Codespace, then run tools/codespace-build.sh.",
-  "source_sha": "6b0f98d97611432a84444dc33f55197ee72b9a65",
-  "updated_at": "2026-08-20T23:47:00Z"
+  "state": "running",
+  "stage": "setup_godot",
+  "detail": "Installing or reusing Godot 4.4.1 and export templates",
+  "source_sha": "9906fad3d20b160b28344f91c3af0d24eec8acd9",
+  "updated_at": "2026-08-21T00:29:22Z"
 }
