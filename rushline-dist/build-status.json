@@ -1,7 +1,7 @@
 {
   "state": "success",
-  "stage": "setup_complete",
-  "detail": "Godot, GitHub CLI and Android toolchain ready",
+  "stage": "setup",
+  "detail": "Codespace toolchain ready",
   "source_sha": "ba17332d7cc1c8890d674c3bb8712ff8045ea74f",
-  "updated_at": "2026-08-21T00:38:37Z"
+  "updated_at": "2026-08-21T00:38:38Z"
 }
