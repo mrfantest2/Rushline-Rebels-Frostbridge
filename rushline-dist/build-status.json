@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release_import",
-  "detail": "Importing Godot project",
+  "stage": "release_tests",
+  "detail": "Running Rushline headless tests",
   "source_sha": "dbc7773e5db9055c48005c5bab94c53594a30e7a",
-  "updated_at": "2026-08-21T06:16:02Z"
+  "updated_at": "2026-08-21T06:16:10Z"
 }
