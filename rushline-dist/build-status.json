@@ -1,7 +1,7 @@
 {
-  "state": "running",
+  "state": "failed",
   "stage": "release_apk",
-  "detail": "Exporting signed Android APK",
+  "detail": "Release exited with code 1",
   "source_sha": "ba17332d7cc1c8890d674c3bb8712ff8045ea74f",
-  "updated_at": "2026-08-21T00:38:59Z"
+  "updated_at": "2026-08-21T00:39:07Z"
 }
