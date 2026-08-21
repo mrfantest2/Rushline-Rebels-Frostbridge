@@ -1,8 +1,8 @@
 {
-  "version": "0.0.0",
-  "apk_url": "https://github.com/mrfantest2/Rushline-Rebels-Frostbridge/releases",
+  "version": "0.1.0",
+  "apk_url": "https://github.com/mrfantest2/Rushline-Rebels-Frostbridge/releases/download/rushline-v0.1.0/Rushline-v0.1.0.apk",
   "web_url": "",
-  "notes": "Rushline distribution channel initialized. No public APK has been published yet.",
+  "notes": "Rushline Rebels rushline-v0.1.0 — cloud-built Android alpha from private source.",
   "mandatory": false,
-  "published_at": ""
+  "published_at": "2026-08-21T00:44:30Z"
 }
