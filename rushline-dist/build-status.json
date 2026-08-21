@@ -1,7 +1,7 @@
 {
   "state": "failed",
-  "stage": "release_apk",
-  "detail": "Release exited with code 1",
+  "stage": "release",
+  "detail": "Codespace build exited with code 1",
   "source_sha": "ba17332d7cc1c8890d674c3bb8712ff8045ea74f",
-  "updated_at": "2026-08-21T00:39:07Z"
+  "updated_at": "2026-08-21T00:39:09Z"
 }
