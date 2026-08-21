@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release",
-  "detail": "Running tests, signing and Android release",
+  "stage": "release_auth",
+  "detail": "Checking GitHub access and distribution repository",
   "source_sha": "bd8bd01e504722f1ce15951bf404bcaf2a79290f",
-  "updated_at": "2026-08-21T02:47:48Z"
+  "updated_at": "2026-08-21T02:47:50Z"
 }
