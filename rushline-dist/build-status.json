@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "setup",
-  "detail": "Installing Godot, JDK and Android SDK",
+  "stage": "setup_packages",
+  "detail": "Checking JDK, GitHub CLI and base packages",
   "source_sha": "80b6d7d09ecfed64098f7fa37c58a4c975205e8b",
-  "updated_at": "2026-08-21T00:43:31Z"
+  "updated_at": "2026-08-21T00:43:33Z"
 }
