@@ -1,7 +1,7 @@
 {
-  "state": "failed",
-  "stage": "task4_test",
-  "detail": "RED/FAIL on d577f9ce7cd50bd75ff9ea1242974be2f7421196 exit 3:    at: load_source_code (modules/gdscript/gdscript.cpp:1115) ERROR: Failed loading resource: res://scripts/progression/player_statistics.gd. Make sure resources have been imported by opening the project in the editor at least once.    at: _load (core/io/resource_loader.cpp:343) ERROR: Missing script: res://scripts/progression/player_statistics.gd    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Attempt to open script 'res://scripts/progression/daily_event.gd' resulted in error 'File not found'.    at: load_source_code (modules/gdscript/gdscript.cpp:1115) ERROR: Failed loading resource: res://scripts/progression/daily_event.gd. Make sure resources have been imported by opening the project in the editor at least once.    at: _load (core/io/resource_loader.cpp:343) ERROR: Missing script: res://scripts/progression/daily_event.gd    at: push_error (core/variant/variant_utility.cpp:1098) Rushline v0.3 Task 4 RED test: FAIL (3)",
-  "source_sha": "d577f9ce7cd50bd75ff9ea1242974be2f7421196",
-  "updated_at": "2026-08-21T05:32:58Z"
+  "state": "success",
+  "stage": "task6_red",
+  "detail": "Expected RED observed on bd486fe1f7e59b555247d37f29897493b1b8e2d9:    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Main menu missing MISSIONS    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing STORE    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing EVENTS    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing PROFILE    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing SETTINGS    at: push_error (core/variant/variant_utility.cpp:1098) Rushline v0.3 Task 6 RED test: FAIL (16)",
+  "source_sha": "bd486fe1f7e59b555247d37f29897493b1b8e2d9",
+  "updated_at": "2026-08-21T05:45:29Z"
 }
