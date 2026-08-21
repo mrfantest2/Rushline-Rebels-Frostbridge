@@ -1,7 +1,7 @@
 {
   "state": "success",
-  "stage": "task7_green",
-  "detail": "Clean Task 7 GREEN on 4bc120afbc581400827427d9122fa189775e975b: \tupdate_scripts_classes: step 1:  \tupdate_scripts_classes: step 2:  update_scripts_classes: end update_script_paths_documentation: begin: Updating scripts documentation steps: 3 \tupdate_script_paths_documentation: step 0: main.gd \tupdate_script_paths_documentation: step 1: main_base.gd \tupdate_script_paths_documentation: step 2: test_v03_task7_red.gd update_script_paths_documentation: end loading_editor_layout: begin: Loading editor steps: 5 \tloading_editor_layout: step 0: Loading editor layout... loading_editor_layout: end cannot connect to daemon at tcp:5037: Connection refused Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  Rushline v0.3 Task 7 RED test: PASS (unexpected before implementation)",
-  "source_sha": "4bc120afbc581400827427d9122fa189775e975b",
-  "updated_at": "2026-08-21T05:57:10Z"
+  "stage": "task8_red",
+  "detail": "Expected v0.3 metadata RED on 39631e52c6b6e41c17741c08e05271110261e650: Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  ERROR: Godot project version must be 0.3.0    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Android version code/name must be 3 / 0.3.0    at: push_error (core/variant/variant_utility.cpp:1098) Rushline v0.3 Task 8 RED test: FAIL (2)",
+  "source_sha": "39631e52c6b6e41c17741c08e05271110261e650",
+  "updated_at": "2026-08-21T06:06:29Z"
 }
