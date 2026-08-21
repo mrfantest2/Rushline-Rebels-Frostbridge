@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release_apk",
-  "detail": "Exporting signed Android APK",
+  "stage": "release_verify_apk",
+  "detail": "Verifying APK signature",
   "source_sha": "80b6d7d09ecfed64098f7fa37c58a4c975205e8b",
-  "updated_at": "2026-08-21T00:44:09Z"
+  "updated_at": "2026-08-21T00:44:26Z"
 }
