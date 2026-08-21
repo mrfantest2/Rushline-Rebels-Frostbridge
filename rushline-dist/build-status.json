@@ -1,7 +1,7 @@
 {
-  "state": "success",
-  "stage": "complete",
-  "detail": "Rushline v0.1.0 APK published and verified",
-  "source_sha": "80b6d7d09ecfed64098f7fa37c58a4c975205e8b",
-  "updated_at": "2026-08-21T00:44:46Z"
+  "state": "running",
+  "stage": "bootstrap",
+  "detail": "Rushline Codespace pipeline started",
+  "source_sha": "0c4371545fff74d8736c562c7cbb920668129cb0",
+  "updated_at": "2026-08-21T02:29:26Z"
 }
