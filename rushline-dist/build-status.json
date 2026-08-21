@@ -1,7 +1,7 @@
 {
-  "state": "failed",
-  "stage": "task6_red",
-  "detail": "Unexpected Task 6 pass on b437bf00f6db1595ad17d8bf94297af36d2f218f:    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) Rushline v0.3 Task 6 RED test: PASS (unexpected before implementation)",
-  "source_sha": "b437bf00f6db1595ad17d8bf94297af36d2f218f",
-  "updated_at": "2026-08-21T05:47:47Z"
+  "state": "success",
+  "stage": "task6_green",
+  "detail": "Clean Task 6 GREEN on 4b42b5f7793d6e1b8bfe20262ecbb5f333a12d4b: update_scripts_classes: begin: Registering global classes... steps: 2 \tupdate_scripts_classes: step 0:  \tupdate_scripts_classes: step 1:  update_scripts_classes: end update_script_paths_documentation: begin: Updating scripts documentation steps: 2 \tupdate_script_paths_documentation: step 0: main.gd \tupdate_script_paths_documentation: step 1: test_v03_task6_red.gd update_script_paths_documentation: end loading_editor_layout: begin: Loading editor steps: 5 \tloading_editor_layout: step 0: Loading editor layout... loading_editor_layout: end cannot connect to daemon at tcp:5037: Connection refused Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  Rushline v0.3 Task 6 RED test: PASS",
+  "source_sha": "4b42b5f7793d6e1b8bfe20262ecbb5f333a12d4b",
+  "updated_at": "2026-08-21T05:49:40Z"
 }
