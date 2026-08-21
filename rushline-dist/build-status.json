@@ -1,7 +1,7 @@
 {
-  "state": "success",
-  "stage": "task8_red",
-  "detail": "Expected v0.3 metadata RED on 39631e52c6b6e41c17741c08e05271110261e650: Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  ERROR: Godot project version must be 0.3.0    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Android version code/name must be 3 / 0.3.0    at: push_error (core/variant/variant_utility.cpp:1098) Rushline v0.3 Task 8 RED test: FAIL (2)",
-  "source_sha": "39631e52c6b6e41c17741c08e05271110261e650",
-  "updated_at": "2026-08-21T06:06:29Z"
+  "state": "running",
+  "stage": "bootstrap",
+  "detail": "Rushline Codespace pipeline started",
+  "source_sha": "dbc7773e5db9055c48005c5bab94c53594a30e7a",
+  "updated_at": "2026-08-21T06:15:36Z"
 }
