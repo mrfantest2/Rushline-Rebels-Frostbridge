@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release_signing",
-  "detail": "Preparing stable private signing identity",
+  "stage": "release_apk",
+  "detail": "Exporting signed Android APK",
   "source_sha": "e3f079f1d5655fefb0665c4c1c470a66ff0d9225",
-  "updated_at": "2026-08-21T03:07:00Z"
+  "updated_at": "2026-08-21T03:07:03Z"
 }
