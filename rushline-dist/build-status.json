@@ -1,7 +1,7 @@
 {
-  "state": "failed",
-  "stage": "release_tests",
-  "detail": "Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  SCRIPT ERROR: Parse Error: Cannot infer the type of \"before\" variable because the value doesn't have a set type.           at: GDScript::reload (res://tests/test_runner.gd:127) ERROR: Failed to load script \"res://tests/test_runner.gd\" with error \"Parse error\".    at: load (modules/gdscript/gdscript.cpp:3022) ",
-  "source_sha": "c9deb0d377fbd9efa461b9fa3c497e1acf2e19f2",
-  "updated_at": "2026-08-21T02:53:33Z"
+  "state": "running",
+  "stage": "bootstrap",
+  "detail": "Rushline Codespace pipeline started",
+  "source_sha": "fb5847277065ebcd69b7b521d249c0b34437d324",
+  "updated_at": "2026-08-21T02:58:50Z"
 }
