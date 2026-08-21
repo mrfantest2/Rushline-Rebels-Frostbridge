@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "setup_godot",
-  "detail": "Installing or reusing Godot 4.4.1 and export templates",
+  "stage": "setup_android_cli",
+  "detail": "Installing or reusing Android command-line tools",
   "source_sha": "80b6d7d09ecfed64098f7fa37c58a4c975205e8b",
-  "updated_at": "2026-08-21T00:43:34Z"
+  "updated_at": "2026-08-21T00:43:36Z"
 }
