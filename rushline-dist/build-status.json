@@ -1,7 +1,7 @@
 {
-  "state": "success",
-  "stage": "complete",
-  "detail": "Rushline v0.2.0 APK published and verified",
-  "source_sha": "e3f079f1d5655fefb0665c4c1c470a66ff0d9225",
-  "updated_at": "2026-08-21T03:07:47Z"
+  "state": "running",
+  "stage": "setup_packages",
+  "detail": "Checking JDK, GitHub CLI and base packages",
+  "source_sha": "f4cfe8984fcab053c6978b004311c1f9756f5b3b",
+  "updated_at": "2026-08-21T04:34:30Z"
 }
