@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "setup_android_cli",
-  "detail": "Installing or reusing Android command-line tools",
+  "stage": "setup_android_sdk",
+  "detail": "Installing Android platform 35 and build-tools 35.0.1",
   "source_sha": "9906fad3d20b160b28344f91c3af0d24eec8acd9",
-  "updated_at": "2026-08-21T00:29:24Z"
+  "updated_at": "2026-08-21T00:29:25Z"
 }
