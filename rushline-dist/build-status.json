@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release_manifest",
-  "detail": "Generating v0.3.0 updater manifest",
+  "stage": "release_publish",
+  "detail": "Publishing APK to binary-only public release channel",
   "source_sha": "dbc7773e5db9055c48005c5bab94c53594a30e7a",
-  "updated_at": "2026-08-21T06:16:40Z"
+  "updated_at": "2026-08-21T06:16:42Z"
 }
