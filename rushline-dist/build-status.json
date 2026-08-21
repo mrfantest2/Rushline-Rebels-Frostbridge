@@ -1,7 +1,7 @@
 {
-  "state": "success",
-  "stage": "setup",
-  "detail": "Codespace toolchain ready",
+  "state": "running",
+  "stage": "release",
+  "detail": "Running tests, signing and Android release",
   "source_sha": "e3f079f1d5655fefb0665c4c1c470a66ff0d9225",
-  "updated_at": "2026-08-21T03:06:43Z"
+  "updated_at": "2026-08-21T03:06:45Z"
 }
