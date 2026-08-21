@@ -1,7 +1,7 @@
 {
-  "state": "running",
+  "state": "failed",
   "stage": "release_tests",
-  "detail": "Running Rushline headless tests",
+  "detail": "Release exited with code 1",
   "source_sha": "bd8bd01e504722f1ce15951bf404bcaf2a79290f",
-  "updated_at": "2026-08-21T02:48:01Z"
+  "updated_at": "2026-08-21T02:48:04Z"
 }
