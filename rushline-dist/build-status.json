@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "setup_android_sdk",
-  "detail": "Installing Android platform 35 and build-tools 35.0.1",
+  "stage": "setup_godot_android",
+  "detail": "Configuring Godot Android SDK paths",
   "source_sha": "f4cfe8984fcab053c6978b004311c1f9756f5b3b",
-  "updated_at": "2026-08-21T04:34:42Z"
+  "updated_at": "2026-08-21T04:34:55Z"
 }
