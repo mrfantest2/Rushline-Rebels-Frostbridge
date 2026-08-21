@@ -1,7 +1,7 @@
 {
   "state": "success",
   "stage": "task7_red",
-  "detail": "Expected RED observed on 5cea8892e5d8b5c397bdebc2599dd684e6a34251: Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  ERROR: STATE_PAUSED must exist and be distinct from STATE_RUNNING    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Missing Task 7 method: _pause_run    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Missing Task 7 method: _resume_run    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Missing Task 7 method: _restart_paused_run    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Missing Task 7 method: _quit_paused_run    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Missing Task 7 method: _show_pause_overlay    at: push_error (core/variant/variant_utility.cpp:1098) Rushline v0.3 Task 7 RED test: FAIL (6)",
-  "source_sha": "5cea8892e5d8b5c397bdebc2599dd684e6a34251",
-  "updated_at": "2026-08-21T05:52:42Z"
+  "detail": "Expected RED observed on a09d4c01ca51bc89bc6488cd62782509faeaadfa: Godot Engine v4.4.1.stable.official.49a5bc7b6 - https://godotengine.org  ERROR: Task 7 fixture must enter running state    at: push_error (core/variant/variant_utility.cpp:1098) Rushline v0.3 Task 7 RED test: FAIL (1)",
+  "source_sha": "a09d4c01ca51bc89bc6488cd62782509faeaadfa",
+  "updated_at": "2026-08-21T05:55:38Z"
 }
