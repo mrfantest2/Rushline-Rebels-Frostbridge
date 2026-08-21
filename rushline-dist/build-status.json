@@ -1,7 +1,7 @@
 {
-  "state": "running",
-  "stage": "release_remote_verify",
-  "detail": "Verifying manifest and APK from GitHub",
+  "state": "success",
+  "stage": "complete",
+  "detail": "Rushline v0.3.0 APK published and remotely verified",
   "source_sha": "dbc7773e5db9055c48005c5bab94c53594a30e7a",
-  "updated_at": "2026-08-21T06:16:51Z"
+  "updated_at": "2026-08-21T06:16:54Z"
 }
