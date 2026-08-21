@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release_auth",
-  "detail": "Checking GitHub access and distribution repository",
+  "stage": "release_policy",
+  "detail": "Checking cloud-only policy",
   "source_sha": "bd8bd01e504722f1ce15951bf404bcaf2a79290f",
-  "updated_at": "2026-08-21T02:47:50Z"
+  "updated_at": "2026-08-21T02:47:52Z"
 }
