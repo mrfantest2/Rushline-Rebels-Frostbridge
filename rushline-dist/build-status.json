@@ -1,7 +1,7 @@
 {
-  "state": "failed",
-  "stage": "release",
-  "detail": "Codespace build exited with code 1",
-  "source_sha": "ba17332d7cc1c8890d674c3bb8712ff8045ea74f",
-  "updated_at": "2026-08-21T00:39:09Z"
+  "state": "running",
+  "stage": "bootstrap",
+  "detail": "Rushline Codespace pipeline started",
+  "source_sha": "80b6d7d09ecfed64098f7fa37c58a4c975205e8b",
+  "updated_at": "2026-08-21T00:43:29Z"
 }
