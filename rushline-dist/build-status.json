@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "bootstrap",
-  "detail": "Rushline Codespace pipeline started",
+  "stage": "setup",
+  "detail": "Installing Godot, JDK and Android SDK",
   "source_sha": "e3f079f1d5655fefb0665c4c1c470a66ff0d9225",
-  "updated_at": "2026-08-21T03:06:26Z"
+  "updated_at": "2026-08-21T03:06:27Z"
 }
