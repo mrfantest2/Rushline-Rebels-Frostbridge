@@ -1,7 +1,7 @@
 {
-  "state": "running",
-  "stage": "setup_godot_android",
-  "detail": "Configuring Godot Android SDK paths",
+  "state": "success",
+  "stage": "setup_complete",
+  "detail": "Godot, GitHub CLI and Android toolchain ready",
   "source_sha": "e3f079f1d5655fefb0665c4c1c470a66ff0d9225",
-  "updated_at": "2026-08-21T03:06:40Z"
+  "updated_at": "2026-08-21T03:06:42Z"
 }
