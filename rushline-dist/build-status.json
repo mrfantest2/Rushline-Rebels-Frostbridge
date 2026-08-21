@@ -1,7 +1,7 @@
 {
-  "state": "success",
+  "state": "failed",
   "stage": "task6_red",
-  "detail": "Expected RED observed on bd486fe1f7e59b555247d37f29897493b1b8e2d9:    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Main menu missing MISSIONS    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing STORE    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing EVENTS    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing PROFILE    at: push_error (core/variant/variant_utility.cpp:1098) ERROR: Main menu missing SETTINGS    at: push_error (core/variant/variant_utility.cpp:1098) Rushline v0.3 Task 6 RED test: FAIL (16)",
-  "source_sha": "bd486fe1f7e59b555247d37f29897493b1b8e2d9",
-  "updated_at": "2026-08-21T05:45:29Z"
+  "detail": "Unexpected Task 6 pass on b437bf00f6db1595ad17d8bf94297af36d2f218f:    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) ERROR: Condition \"!is_inside_tree()\" is true. Returning: Rect2()    at: get_viewport_rect (scene/main/canvas_item.cpp:1076) Rushline v0.3 Task 6 RED test: PASS (unexpected before implementation)",
+  "source_sha": "b437bf00f6db1595ad17d8bf94297af36d2f218f",
+  "updated_at": "2026-08-21T05:47:47Z"
 }
