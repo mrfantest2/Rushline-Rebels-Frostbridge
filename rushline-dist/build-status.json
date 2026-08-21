@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "release_policy",
-  "detail": "Checking cloud-only policy",
+  "stage": "release_import",
+  "detail": "Importing Godot project",
   "source_sha": "bd8bd01e504722f1ce15951bf404bcaf2a79290f",
-  "updated_at": "2026-08-21T02:47:52Z"
+  "updated_at": "2026-08-21T02:47:54Z"
 }
