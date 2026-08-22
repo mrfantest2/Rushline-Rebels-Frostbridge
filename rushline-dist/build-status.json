@@ -1,7 +1,7 @@
 {
-  "state": "failed",
+  "state": "success",
   "stage": "task1_preflight",
-  "detail": "Historical v0.3 Task 1 failed: v0.2 save must migrate to schema 3; full runner printed Rushline tests: PASS but reported JSON parse error and leaked resources; direct APK export initially used an invalid project-relative path, corrected export and signature verification passed.",
-  "source_sha": "93ff33cdf63d969f05f6e4067fdb201ae5170974",
-  "updated_at": "2026-08-22T00:55:52Z"
+  "detail": "Task 1 preflight passed: clean import, all Task 3 red scripts, v0.4 Task 1 red, test_runner, cloud-only check, git diff --check, and signed APK verification succeeded",
+  "source_sha": "6654c1c6e47f2267ffa3bd1a55ae9366a83603d9",
+  "updated_at": "2026-08-22T01:25:04Z"
 }
