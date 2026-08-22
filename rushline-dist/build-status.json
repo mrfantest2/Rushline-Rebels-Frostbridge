@@ -1,7 +1,7 @@
 {
-  "state": "failed",
+  "state": "success",
   "stage": "task4_preflight",
-  "detail": "approved Quaternius archives require itch.io purchase flow; direct signed downloads returned HTML instead of ZIP archives",
-  "source_sha": "0581cf918cf6c2cc750c61b4476d69ef29fff9aa",
-  "updated_at": "2026-08-22T10:35:06Z"
+  "detail": "Tasks 2-4 passed using verified Quaternius CC0 Standard assets via GitHub transport mirrors",
+  "source_sha": "d9f3bfcd0b9cd0d1d50aca7da871229d57dd5691",
+  "updated_at": "2026-08-22T10:58:36Z"
 }
