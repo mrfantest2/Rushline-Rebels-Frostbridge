@@ -1,7 +1,7 @@
 {
   "state": "running",
-  "stage": "setup_packages",
-  "detail": "Checking JDK, GitHub CLI and base packages",
+  "stage": "setup_godot",
+  "detail": "Installing or reusing Godot 4.4.1 and export templates",
   "source_sha": "93ff33cdf63d969f05f6e4067fdb201ae5170974",
-  "updated_at": "2026-08-22T00:47:28Z"
+  "updated_at": "2026-08-22T00:47:30Z"
 }
