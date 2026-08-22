@@ -1,7 +1,7 @@
 {
   "state": "success",
   "stage": "task1_preflight",
-  "detail": "Task 1 preflight passed: clean import, all Task 3 red scripts, v0.4 Task 1 red, test_runner, cloud-only check, git diff --check, and signed APK verification succeeded",
+  "detail": "Task 1 preflight passed: HEAD matches origin/feature/v0.4-visual-content-upgrade exactly; clean import and all required tests passed; verify-cloud-only.sh passed; git diff --check passed; signed APK was exported and verified. Exact warning/error lines captured: ERROR: Parse JSON failed. Error at line 0: Expected key; WARNING: ObjectDB instances leaked at exit (run with --verbose for details).; ERROR: 1 resources still in use at exit (run with --verbose for details).",
   "source_sha": "6654c1c6e47f2267ffa3bd1a55ae9366a83603d9",
-  "updated_at": "2026-08-22T01:25:04Z"
+  "updated_at": "2026-08-22T01:26:19Z"
 }
