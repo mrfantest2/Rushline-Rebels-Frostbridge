@@ -1,7 +1,7 @@
 {
-  "state": "success",
-  "stage": "task1_preflight",
-  "detail": "Task 1 preflight passed: HEAD matches origin/feature/v0.4-visual-content-upgrade exactly; clean import and all required tests passed; verify-cloud-only.sh passed; git diff --check passed; signed APK was exported and verified. Exact warning/error lines captured: ERROR: Parse JSON failed. Error at line 0: Expected key; WARNING: ObjectDB instances leaked at exit (run with --verbose for details).; ERROR: 1 resources still in use at exit (run with --verbose for details).",
-  "source_sha": "6654c1c6e47f2267ffa3bd1a55ae9366a83603d9",
-  "updated_at": "2026-08-22T01:26:19Z"
+  "state": "failed",
+  "stage": "task4_preflight",
+  "detail": "approved Quaternius archives require itch.io purchase flow; direct signed downloads returned HTML instead of ZIP archives",
+  "source_sha": "0581cf918cf6c2cc750c61b4476d69ef29fff9aa",
+  "updated_at": "2026-08-22T10:35:06Z"
 }
